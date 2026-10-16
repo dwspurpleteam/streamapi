@@ -40,7 +40,7 @@ func newApp(c *config, logger *slog.Logger) (*app, error) {
 		return nil, fmt.Errorf("configure event publisher: %w", err)
 	}
 
-	receiver := events.New(publisher, c.Events.Concurrency, c.Events.PublishTimeout)
+	receiver := events.New(publisher, c.Events.PublishTimeout)
 	verifier := webhooklivekit.NewVerifier(
 		c.LiveKit.APIKey,
 		c.LiveKit.APISecret,

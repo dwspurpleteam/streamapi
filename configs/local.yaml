@@ -36,7 +36,6 @@ media:
   queue_age: 1000ms
 
 events:
-  concurrency: 32
   publish_timeout: 1s
   delivery:
     max_subscriptions: 512

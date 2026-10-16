@@ -20,7 +20,6 @@ type Publisher interface {
 
 type Receiver struct {
 	publisher Publisher
-	slots     chan struct{}
 	timeout   time.Duration
 	accepted  atomic.Uint64
 	failed    atomic.Uint64
@@ -33,10 +32,9 @@ type Snapshot struct {
 	Rejected uint64
 }
 
-func New(publisher Publisher, concurrency int, timeout time.Duration) *Receiver {
+func New(publisher Publisher, timeout time.Duration) *Receiver {
 	return &Receiver{
 		publisher: publisher,
-		slots:     make(chan struct{}, concurrency),
 		timeout:   timeout,
 	}
 }
@@ -50,17 +48,6 @@ func (r *Receiver) Accept(ctx context.Context, event domain.Event) error {
 
 	if err := ctx.Err(); err != nil {
 		return err
-	}
-
-	select {
-	case r.slots <- struct{}{}:
-		defer func() {
-			<-r.slots
-		}()
-	default:
-		r.rejected.Add(1)
-
-		return ErrBusy
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, r.timeout)

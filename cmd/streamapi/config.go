@@ -58,7 +58,6 @@ type mediaConfig struct {
 }
 
 type eventsConfig struct {
-	Concurrency    int            `yaml:"concurrency"`
 	PublishTimeout time.Duration  `yaml:"publish_timeout"`
 	Delivery       deliveryConfig `yaml:"delivery"`
 }
