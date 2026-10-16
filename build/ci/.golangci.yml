@@ -2,7 +2,7 @@ version: "2"
 run:
   go: "1.27"
   relative-path-mode: gomod
-  modules-download-mode: readonly
+  modules-download-mode: vendor
 output:
   path-mode: abs
   formats:

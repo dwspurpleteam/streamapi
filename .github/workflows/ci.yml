@@ -1,0 +1,54 @@
+name: ci
+
+on:
+  push:
+    branches: ['**']
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: ${{ matrix.check }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+
+    strategy:
+      fail-fast: false
+      matrix:
+        check: [vet, test, build, vuln]
+        include:
+          - check: vendor
+            command: |
+              make vendor
+              git add --intent-to-add .
+              git diff --exit-code
+
+          - check: lint
+            command: |
+              make fmt
+              git diff --exit-code
+              make lint
+
+          - check: generate
+            command: |
+              make generate
+              git add --intent-to-add .
+              git diff --exit-code
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - uses: arduino/setup-protoc@v3
+        if: matrix.check == 'generate'
+        with:
+          version: '36.2'
+          repo-token: ${{ github.token }}
+
+      - run: ${{ matrix.command || format('make {0}', matrix.check) }}
