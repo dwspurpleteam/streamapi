@@ -1,0 +1,53 @@
+name: ci
+
+on:
+  push:
+    branches: ['**']
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: ${{ matrix.check }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+
+    strategy:
+      fail-fast: false
+      matrix:
+        check: [test, build, vuln, lint, vendor, generate]
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+            ~/.cache/golangci-lint
+            build/bin
+          key: ci-${{ matrix.check }}-${{ hashFiles('go.mod', 'go.sum', 'Makefile') }}-${{ github.sha }}
+          restore-keys: |
+            ci-${{ matrix.check }}-${{ hashFiles('go.mod', 'go.sum', 'Makefile') }}-
+
+      - uses: arduino/setup-protoc@v3
+        if: matrix.check == 'generate'
+        with:
+          version: '36.2'
+          repo-token: ${{ github.token }}
+
+      - run: make ${{ matrix.check }}
+
+      - if: matrix.check == 'vendor' || matrix.check == 'generate'
+        run: |
+          git add --intent-to-add .
+          git diff --exit-code
