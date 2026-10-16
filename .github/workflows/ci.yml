@@ -16,25 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        check: [vet, test, build, vuln]
-        include:
-          - check: vendor
-            command: |
-              make vendor
-              git add --intent-to-add .
-              git diff --exit-code
-
-          - check: lint
-            command: |
-              make fmt
-              git diff --exit-code
-              make lint
-
-          - check: generate
-            command: |
-              make generate
-              git add --intent-to-add .
-              git diff --exit-code
+        check: [test, build, vuln, lint, vendor, generate]
 
     steps:
       - uses: actions/checkout@v6
@@ -44,6 +26,18 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
+          cache: false
+
+      - uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+            ~/.cache/golangci-lint
+            build/bin
+          key: ci-${{ matrix.check }}-${{ hashFiles('go.mod', 'go.sum', 'Makefile') }}-${{ github.sha }}
+          restore-keys: |
+            ci-${{ matrix.check }}-${{ hashFiles('go.mod', 'go.sum', 'Makefile') }}-
 
       - uses: arduino/setup-protoc@v3
         if: matrix.check == 'generate'
@@ -51,4 +45,9 @@ jobs:
           version: '36.2'
           repo-token: ${{ github.token }}
 
-      - run: ${{ matrix.command || format('make {0}', matrix.check) }}
+      - run: make ${{ matrix.check }}
+
+      - if: matrix.check == 'vendor' || matrix.check == 'generate'
+        run: |
+          git add --intent-to-add .
+          git diff --exit-code
