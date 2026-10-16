@@ -1,4 +1,4 @@
-module github.com/dwspurpleteam/callrelay
+module github.com/dwspurpleteam/streamapi
 
 go 1.27.0
 

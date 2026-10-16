@@ -1,3 +1,5 @@
+name: streamapi
+
 grpc:
   latency_buckets_seconds: [0.0001, 0.00025, 0.0005, 0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2]
   max_concurrent_streams: 512
@@ -48,8 +50,8 @@ events:
 
 livekit:
   url: ws://127.0.0.1:17880
-  api_key: callrelay-dev
-  api_secret: callrelay-development-secret-00000000
+  api_key: streamapi-dev
+  api_secret: streamapi-development-secret-00000000
   max_tracks: 64
   max_packet_bytes: 4096
   connect_timeout: 5000ms
@@ -66,10 +68,10 @@ livekit:
 
 nats:
   url: nats://127.0.0.1:14222
-  username: callrelay
-  password: callrelay-dev
-  stream: CALLRELAY_EVENTS
-  prefix: callrelay.v1
+  username: streamapi
+  password: streamapi-dev
+  stream: STREAMAPI_EVENTS
+  prefix: streamapi.v1
   max_bytes: 33554432
   max_age: 3600s
   duplicate_window: 120s

@@ -53,51 +53,60 @@ linters:
         shared:
           files: ["**/pkg/**.go"]
           deny:
-            - pkg: github.com/dwspurpleteam/callrelay/internal
-            - pkg: github.com/dwspurpleteam/callrelay/cmd
+            - pkg: github.com/dwspurpleteam/streamapi/internal
+            - pkg: github.com/dwspurpleteam/streamapi/cmd
+        media-app:
+          files: ["**/internal/app/media/**.go"]
+          deny:
+            - pkg: github.com/dwspurpleteam/streamapi/internal/app/events
+            - pkg: github.com/dwspurpleteam/streamapi/cmd
+        events-app:
+          files: ["**/internal/app/events/**.go"]
+          deny:
+            - pkg: github.com/dwspurpleteam/streamapi/internal/app/media
+            - pkg: github.com/dwspurpleteam/streamapi/cmd
         domain:
-          files: ["**/internal/app/callrelay/domain/**.go"]
+          files: ["**/internal/app/*/domain/**.go"]
           list-mode: strict
           allow: [$gostd]
         media:
-          files: ["**/internal/app/callrelay/service/media/**.go"]
+          files: ["**/internal/app/media/service/**.go"]
           list-mode: strict
           allow:
             - $gostd
-            - github.com/dwspurpleteam/callrelay/internal/app/callrelay/domain$
-            - github.com/dwspurpleteam/callrelay/pkg/ratelimit$
+            - github.com/dwspurpleteam/streamapi/internal/app/media/domain$
+            - github.com/dwspurpleteam/streamapi/pkg/ratelimit$
         events:
-          files: ["**/internal/app/callrelay/service/events/**.go"]
+          files: ["**/internal/app/events/service/**.go"]
           list-mode: strict
           allow:
             - $gostd
-            - github.com/dwspurpleteam/callrelay/internal/app/callrelay/domain$
-        grpc:
-          files: ["**/internal/app/callrelay/ports/grpc/**.go"]
+            - github.com/dwspurpleteam/streamapi/internal/app/events/domain$
+        media-grpc:
+          files: ["**/internal/app/media/ports/grpc/**.go"]
           deny:
-            - pkg: github.com/dwspurpleteam/callrelay/internal/app/callrelay/adapters
-            - pkg: github.com/dwspurpleteam/callrelay/internal/app/callrelay/ports/webhook
+            - pkg: github.com/dwspurpleteam/streamapi/internal/app/media/adapters
+        events-grpc:
+          files: ["**/internal/app/events/ports/grpc/**.go"]
+          deny:
+            - pkg: github.com/dwspurpleteam/streamapi/internal/app/events/adapters
+            - pkg: github.com/dwspurpleteam/streamapi/internal/app/events/ports/webhook
         webhook:
-          files: ["**/internal/app/callrelay/ports/webhook/**.go"]
+          files: ["**/internal/app/events/ports/webhook/**.go"]
           deny:
-            - pkg: github.com/dwspurpleteam/callrelay/internal/app/callrelay/adapters
-            - pkg: github.com/dwspurpleteam/callrelay/internal/app/callrelay/ports/grpc
-            - pkg: github.com/dwspurpleteam/callrelay/internal/app/callrelay/service/media
-            - pkg: github.com/dwspurpleteam/callrelay/internal/pkg/gen
+            - pkg: github.com/dwspurpleteam/streamapi/internal/app/events/adapters
+            - pkg: github.com/dwspurpleteam/streamapi/internal/app/events/ports/grpc
+            - pkg: github.com/dwspurpleteam/streamapi/internal/pkg/gen
         livekit:
-          files: ["**/internal/app/callrelay/adapters/livekit/**.go"]
+          files: ["**/internal/app/media/adapters/livekit/**.go"]
           deny:
-            - pkg: github.com/dwspurpleteam/callrelay/internal/app/callrelay/ports
-            - pkg: github.com/dwspurpleteam/callrelay/internal/app/callrelay/adapters/nats
-            - pkg: github.com/dwspurpleteam/callrelay/internal/app/callrelay/service/events
-            - pkg: github.com/dwspurpleteam/callrelay/internal/pkg/gen
+            - pkg: github.com/dwspurpleteam/streamapi/internal/app/media/ports
+            - pkg: github.com/dwspurpleteam/streamapi/internal/pkg/gen
         nats:
-          files: ["**/internal/app/callrelay/adapters/nats/**.go"]
+          files: ["**/internal/app/events/adapters/nats/**.go"]
           deny:
-            - pkg: github.com/dwspurpleteam/callrelay/internal/app/callrelay/ports
-            - pkg: github.com/dwspurpleteam/callrelay/internal/app/callrelay/adapters/livekit
-            - pkg: github.com/dwspurpleteam/callrelay/internal/app/callrelay/service/media
-            - pkg: github.com/dwspurpleteam/callrelay/internal/pkg/gen
+            - pkg: github.com/dwspurpleteam/streamapi/internal/app/events/ports
+            - pkg: github.com/dwspurpleteam/streamapi/internal/pkg/gen
     exhaustive:
       default-signifies-exhaustive: true
     gocritic:
@@ -135,7 +144,7 @@ linters:
           yaml: snake
     wrapcheck:
       ignore-package-globs:
-        - github.com/dwspurpleteam/callrelay/internal/app/callrelay/service/*
+        - github.com/dwspurpleteam/streamapi/internal/app/*/service
         - context
         - errors
       ignore-sig-regexps:
@@ -149,7 +158,7 @@ linters:
       - legacy
       - std-error-handling
     rules:
-      - path: internal/app/callrelay/service/media/manager\.go$
+      - path: internal/app/media/service/manager\.go$
         text: Non-inherited new context
         linters: [contextcheck]
       - path: pkg/listener/listener\.go$

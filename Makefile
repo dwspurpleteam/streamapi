@@ -12,11 +12,11 @@ generate: generate/proto
 .PHONY: generate/proto
 generate/proto: bin/protoc-gen-go bin/protoc-gen-go-grpc
 	@mkdir -p internal/pkg/gen
-	@PATH="$(BIN_PATH):$$PATH" protoc -I proto --go_out=internal/pkg/gen --go_opt=paths=source_relative --go-grpc_out=internal/pkg/gen --go-grpc_opt=paths=source_relative proto/callrelay/v1/*.proto
+	@PATH="$(BIN_PATH):$$PATH" protoc -I proto --go_out=internal/pkg/gen --go_opt=paths=source_relative --go-grpc_out=internal/pkg/gen --go-grpc_opt=paths=source_relative proto/streamapi/v1/*.proto
 
 .PHONY: build
 build: | $(BIN_PATH)
-	CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o "$(BIN_PATH)/callrelay" ./cmd/callrelay
+	CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o "$(BIN_PATH)/streamapi" ./cmd/streamapi
 
 .PHONY: vet
 vet:

@@ -1,4 +1,4 @@
-name: callrelay
+name: streamapi
 
 services:
   openvidu:
@@ -6,13 +6,13 @@ services:
     environment:
       LIVEKIT_CONFIG: |
         keys:
-          callrelay-dev: callrelay-development-secret-00000000
+          streamapi-dev: streamapi-development-secret-00000000
         rtc:
           use_external_ip: false
           tcp_port: 7881
           udp_port: 7882
         webhook:
-          api_key: callrelay-dev
+          api_key: streamapi-dev
           urls:
             - http://host.docker.internal:19080/webhooks/livekit
     ports:
@@ -54,8 +54,8 @@ configs:
       port: 4222
       http: 127.0.0.1:8222
       authorization {
-        user: callrelay
-        password: callrelay-dev
+        user: streamapi
+        password: streamapi-dev
       }
       jetstream {
         store_dir: /data

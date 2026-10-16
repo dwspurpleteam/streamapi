@@ -61,5 +61,11 @@ func (h *Histogram) Collect(ch chan<- prometheus.Metric) {
 		}
 	}
 
-	ch <- prometheus.MustNewConstHistogramWithCreatedTimestamp(h.shards[0].Desc(), count, sum, buckets, h.created)
+	ch <- prometheus.MustNewConstHistogramWithCreatedTimestamp(
+		h.shards[0].Desc(),
+		count,
+		sum,
+		buckets,
+		h.created,
+	)
 }
