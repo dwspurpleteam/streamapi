@@ -1,0 +1,180 @@
+version: "2"
+run:
+  go: "1.27"
+  relative-path-mode: gomod
+  modules-download-mode: readonly
+output:
+  path-mode: abs
+  formats:
+    text:
+      path: stdout
+linters:
+  default: all
+  disable:
+    - noinlineerr
+    - varnamelen
+    - exhaustruct
+    - gochecknoglobals
+    - ireturn
+    - recvcheck
+    - wsl
+    - godoclint
+    - exhaustruct_v5
+    - gomodguard
+    - paralleltest
+    - testpackage
+    - funcorder
+    - decorder
+  settings:
+    wsl_v5:
+      enable:
+        - after-block
+    cyclop:
+      max-complexity: 20
+    funlen:
+      lines: 180
+      statements: 100
+    gocognit:
+      min-complexity: 35
+    mnd:
+      checks: [argument, case, condition, operation, return, assign]
+    nestif:
+      min-complexity: 4
+    revive:
+      rules:
+        - name: context-keys-type
+          disabled: true
+        - name: exported
+          disabled: true
+        - name: package-comments
+          disabled: true
+    depguard:
+      rules:
+        domain:
+          files: ["**/internal/app/callrelay/domain/**.go"]
+          list-mode: strict
+          allow: [$gostd]
+        media:
+          files: ["**/internal/app/callrelay/service/media/**.go"]
+          list-mode: strict
+          allow:
+            - $gostd
+            - github.com/dwspurpleteam/callrelay/internal/app/callrelay/domain$
+        events:
+          files: ["**/internal/app/callrelay/service/events/**.go"]
+          list-mode: strict
+          allow:
+            - $gostd
+            - github.com/dwspurpleteam/callrelay/internal/app/callrelay/domain$
+        grpc:
+          files: ["**/internal/app/callrelay/ports/grpc/**.go"]
+          deny:
+            - pkg: github.com/dwspurpleteam/callrelay/internal/app/callrelay/adapters
+            - pkg: github.com/dwspurpleteam/callrelay/internal/app/callrelay/ports/webhook
+            - pkg: github.com/dwspurpleteam/callrelay/internal/app/callrelay/service/events
+        webhook:
+          files: ["**/internal/app/callrelay/ports/webhook/**.go"]
+          deny:
+            - pkg: github.com/dwspurpleteam/callrelay/internal/app/callrelay/adapters
+            - pkg: github.com/dwspurpleteam/callrelay/internal/app/callrelay/ports/grpc
+            - pkg: github.com/dwspurpleteam/callrelay/internal/app/callrelay/service/media
+            - pkg: github.com/dwspurpleteam/callrelay/internal/pkg/gen
+        livekit:
+          files: ["**/internal/app/callrelay/adapters/livekit/**.go"]
+          deny:
+            - pkg: github.com/dwspurpleteam/callrelay/internal/app/callrelay/ports
+            - pkg: github.com/dwspurpleteam/callrelay/internal/app/callrelay/adapters/nats
+            - pkg: github.com/dwspurpleteam/callrelay/internal/app/callrelay/service/events
+            - pkg: github.com/dwspurpleteam/callrelay/internal/pkg/gen
+        nats:
+          files: ["**/internal/app/callrelay/adapters/nats/**.go"]
+          deny:
+            - pkg: github.com/dwspurpleteam/callrelay/internal/app/callrelay/ports
+            - pkg: github.com/dwspurpleteam/callrelay/internal/app/callrelay/adapters/livekit
+            - pkg: github.com/dwspurpleteam/callrelay/internal/app/callrelay/service/media
+            - pkg: github.com/dwspurpleteam/callrelay/internal/pkg/gen
+    exhaustive:
+      default-signifies-exhaustive: true
+    gocritic:
+      enabled-tags: [performance]
+      settings:
+        hugeParam:
+          sizeThreshold: 256
+        rangeValCopy:
+          sizeThreshold: 128
+        rangeExprCopy:
+          sizeThreshold: 512
+    dupl:
+      threshold: 200
+    errcheck:
+      check-blank: true
+    gocyclo:
+      min-complexity: 20
+    govet:
+      disable:
+        - fieldalignment
+      enable-all: true
+    interfacebloat:
+      max: 3
+    lll:
+      line-length: 180
+    maintidx:
+      under: 20
+    nakedret:
+      max-func-lines: 0
+    tagliatelle:
+      case:
+        rules:
+          json: camel
+          mapstructure: snake
+          yaml: snake
+    wrapcheck:
+      ignore-package-globs:
+        - github.com/dwspurpleteam/callrelay/internal/app/callrelay/service/*
+        - context
+        - errors
+      ignore-sig-regexps:
+        - 'google\.golang\.org/grpc/ServerStreamingServer.*\.Send\('
+        - 'google\.golang\.org/grpc/status\.Error\('
+        - 'google\.golang\.org/grpc/internal/status\.Status\)\.Err\('
+  exclusions:
+    generated: lax
+    presets:
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - path: internal/app/callrelay/service/media/manager\.go$
+        text: Non-inherited new context
+        linters: [contextcheck]
+      - path: internal/pkg/listener/listener\.go$
+        linters: [wrapcheck]
+    paths:
+      - _easyjson.go
+      - bin$
+      - api$
+      - build$
+      - configs$
+      - deployments$
+      - docs$
+      - tools$
+      - vendor$
+      - \.git$
+formatters:
+  enable:
+    - gofmt
+    - gofumpt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - _easyjson.go
+      - bin$
+      - api$
+      - build$
+      - configs$
+      - deployments$
+      - docs$
+      - tools$
+      - vendor$
+      - \.git$

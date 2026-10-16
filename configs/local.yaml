@@ -1,0 +1,68 @@
+grpc:
+  latency_buckets_seconds: [0.0001, 0.00025, 0.0005, 0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2]
+  max_concurrent_streams: 512
+  address: 127.0.0.1:19090
+  connections: 128
+  max_message_bytes: 65536
+  write_buffer_bytes: 32768
+  stream_window_bytes: 65536
+  connection_window_bytes: 1048576
+  send_timeout: 1000ms
+  max_header_bytes: 16384
+  keepalive_time: 2m
+  keepalive_timeout: 20s
+
+http:
+  metrics_concurrency: 2
+  metrics_timeout: 1s
+  address: 127.0.0.1:19080
+  connections: 64
+  max_body_bytes: 32768
+  concurrency: 32
+  profiling: true
+  timeout: 5000ms
+  max_header_bytes: 16384
+
+media:
+  max_subscriptions: 512
+  max_per_call: 256
+  queue_packets: 64
+  queue_bytes: 262144
+  max_reserved_bytes: 67108864
+  egress_bytes_per_second: 125000000
+  egress_burst_bytes: 12500000
+  queue_age: 1000ms
+
+events:
+  concurrency: 32
+  publish_timeout: 1s
+
+livekit:
+  url: ws://127.0.0.1:17880
+  max_tracks: 64
+  max_packet_bytes: 4096
+  connect_timeout: 5000ms
+  read_timeout: 500ms
+  token_ttl: 3600s
+  event_source: livekit
+  event_types:
+    room_started: call.started
+    room_finished: call.ended
+    participant_joined: participant.joined
+    participant_left: participant.left
+    track_published: track.published
+    track_unpublished: track.unpublished
+
+nats:
+  url: nats://127.0.0.1:14222
+  stream: CALLRELAY_EVENTS
+  prefix: callrelay.v1
+  max_bytes: 33554432
+  max_age: 3600s
+  duplicate_window: 120s
+  timeout: 1000ms
+  max_message_bytes: 65536
+  reconnect_wait: 1s
+  recovery_interval: 1s
+
+shutdown_timeout: 10000ms

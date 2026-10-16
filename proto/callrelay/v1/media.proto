@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package callrelay.v1;
+
+option go_package = "github.com/dwspurpleteam/callrelay/internal/pkg/gen/callrelay/v1;callrelayv1";
+
+service MediaService {
+  rpc Subscribe(SubscribeRequest) returns (stream SubscribeResponse);
+}
+
+enum MediaKind {
+  MEDIA_KIND_UNSPECIFIED = 0;
+  MEDIA_KIND_AUDIO = 1;
+  MEDIA_KIND_VIDEO = 2;
+}
+
+message SubscribeRequest {
+  string call_id = 1;
+  string room_name = 2;
+  string participant_id = 3;
+  string track_id = 4;
+  repeated MediaKind kinds = 5;
+}
+
+message SubscribeResponse {
+  oneof payload {
+    TrackInfo track = 1;
+    RtpPacket packet = 2;
+    TrackEnded ended = 3;
+  }
+}
+
+message TrackInfo {
+  uint32 handle = 1;
+  string track_id = 2;
+  string participant_id = 3;
+  MediaKind kind = 4;
+  string mime_type = 5;
+  uint32 clock_rate = 6;
+  uint32 channels = 7;
+  string fmtp = 8;
+}
+
+message RtpPacket {
+  uint32 handle = 1;
+  bytes rtp = 2;
+  int64 received_at_unix_nano = 3;
+}
+
+message TrackEnded {
+  uint32 handle = 1;
+}
