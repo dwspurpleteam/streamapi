@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package callrelay.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/dwspurpleteam/callrelay/internal/pkg/gen/callrelay/v1;callrelayv1";
+
+service EventService {
+  rpc Subscribe(SubscribeEventsRequest) returns (stream SubscribeEventsResponse);
+}
+
+message SubscribeEventsRequest {
+  string call_id = 1;
+  string participant_id = 2;
+  repeated string event_types = 3;
+}
+
+message SubscribeEventsResponse {
+  string event_id = 1;
+  string type = 2;
+  string source = 3;
+  string call_id = 4;
+  string room_name = 5;
+  string participant_id = 6;
+  string track_id = 7;
+  google.protobuf.Timestamp occurred_at = 8;
+}

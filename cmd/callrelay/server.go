@@ -12,19 +12,19 @@ import (
 	"google.golang.org/grpc"
 
 	natsadapter "github.com/dwspurpleteam/callrelay/internal/app/callrelay/adapters/nats"
-	"github.com/dwspurpleteam/callrelay/internal/pkg/listener"
+	"github.com/dwspurpleteam/callrelay/pkg/listener"
 )
 
 func (a *app) serve(ctx context.Context, c *config, logger *slog.Logger) error {
 	grpcListener, err := listener.Listen(ctx, c.GRPC.Address, c.GRPC.Connections)
 	if err != nil {
-		return fmt.Errorf("listen gRPC: %w", err)
+		return fmt.Errorf("listen grpc: %w", err)
 	}
 	defer grpcListener.Close()
 
 	httpListener, err := listener.Listen(ctx, c.HTTP.Address, c.HTTP.Connections)
 	if err != nil {
-		return fmt.Errorf("listen HTTP: %w", err)
+		return fmt.Errorf("listen http: %w", err)
 	}
 	defer httpListener.Close()
 
@@ -46,6 +46,9 @@ func (a *app) serve(ctx context.Context, c *config, logger *slog.Logger) error {
 
 	workers.Go(func() {
 		recoverEvents(maintenanceCtx, a.publisher, c.NATS.RecoveryInterval, logger)
+	})
+	workers.Go(func() {
+		a.dispatcher.Run(maintenanceCtx)
 	})
 	workers.Go(func() {
 		errorsCh <- a.grpc.Serve(grpcListener)
@@ -105,8 +108,9 @@ func (a *app) shutdown(ctx context.Context) error {
 	}
 
 	streamErr := a.streams.Wait(ctx)
+	eventStreamErr := a.eventStreams.Wait(ctx)
 
-	return errors.Join(managerErr, httpErr, streamErr)
+	return errors.Join(managerErr, httpErr, streamErr, eventStreamErr)
 }
 
 func recoverEvents(ctx context.Context, publisher *natsadapter.Publisher, interval time.Duration, logger *slog.Logger) {

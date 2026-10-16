@@ -3,7 +3,6 @@ package livekit
 import (
 	"context"
 	"crypto/rand"
-	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -16,8 +15,6 @@ import (
 	"github.com/dwspurpleteam/callrelay/internal/app/callrelay/domain"
 	"github.com/dwspurpleteam/callrelay/internal/app/callrelay/service/media"
 )
-
-var errLogger = errors.New("missing source logger")
 
 type Config struct {
 	URL            string
@@ -36,16 +33,12 @@ type Source struct {
 	logger *slog.Logger
 }
 
-func New(cfg Config, logger *slog.Logger) (*Source, error) {
-	if logger == nil {
-		return nil, errLogger
-	}
-
+func New(cfg Config, logger *slog.Logger) *Source {
 	return &Source{
 		cfg:    cfg,
 		client: lksdk.NewRoomServiceClient(cfg.URL, cfg.APIKey, cfg.APISecret),
 		logger: logger,
-	}, nil
+	}
 }
 
 func (s *Source) Run(ctx context.Context, call domain.Call, emit func(domain.Frame), wants func(domain.Track) bool, changed <-chan struct{}) error {

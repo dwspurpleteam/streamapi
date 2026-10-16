@@ -34,8 +34,17 @@ func (a *app) newHTTPServer(c httpConfig) *http.Server {
 		}
 	})
 
+	mux.HandleFunc("GET /ready/events/stream", func(w http.ResponseWriter, _ *http.Request) {
+		if a.dispatcher.Snapshot().Ready {
+			w.WriteHeader(http.StatusNoContent)
+		} else {
+			w.WriteHeader(http.StatusServiceUnavailable)
+		}
+	})
+
 	registry := prometheus.NewRegistry()
 	registry.MustRegister(a.streams)
+	registry.MustRegister(a.eventStreams)
 	registry.MustRegister(collectors.NewGoCollector(), collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	a.registerMetrics(registry)
 
@@ -89,6 +98,20 @@ func (a *app) registerMetrics(r *prometheus.Registry) {
 				return float64(a.media.Snapshot().ReservedBytes)
 			},
 		},
+		{
+			"callrelay_events_subscriptions",
+			"Active event subscriptions",
+			func() float64 {
+				return float64(a.dispatcher.Snapshot().Subscriptions)
+			},
+		},
+		{
+			"callrelay_events_reserved_bytes",
+			"Payload bytes reserved for event subscriber queues",
+			func() float64 {
+				return float64(a.dispatcher.Snapshot().ReservedBytes)
+			},
+		},
 	} {
 		r.MustRegister(prometheus.NewGaugeFunc(prometheus.GaugeOpts{
 			Name: metric.name,
@@ -110,14 +133,14 @@ func (a *app) registerMetrics(r *prometheus.Registry) {
 		},
 		{
 			"callrelay_media_sent_total",
-			"Media packets handed to gRPC",
+			"Media packets handed to grpc",
 			func() float64 {
 				return float64(a.streams.Snapshot().Sent)
 			},
 		},
 		{
 			"callrelay_media_bytes_total",
-			"Media bytes handed to gRPC",
+			"Media bytes handed to grpc",
 			func() float64 {
 				return float64(a.streams.Snapshot().Bytes)
 			},
@@ -138,7 +161,7 @@ func (a *app) registerMetrics(r *prometheus.Registry) {
 		},
 		{
 			"callrelay_events_published_total",
-			"Events acknowledged by JetStream",
+			"Events acknowledged by jetstream",
 			func() float64 {
 				return float64(a.events.Snapshot().Accepted)
 			},
@@ -148,6 +171,34 @@ func (a *app) registerMetrics(r *prometheus.Registry) {
 			"Event publication failures",
 			func() float64 {
 				return float64(a.events.Snapshot().Failed)
+			},
+		},
+		{
+			"callrelay_events_sent_total",
+			"Events handed to grpc",
+			func() float64 {
+				return float64(a.eventStreams.Snapshot().Sent)
+			},
+		},
+		{
+			"callrelay_events_slow_total",
+			"Slow event consumers disconnected",
+			func() float64 {
+				return float64(a.eventStreams.Snapshot().Slow)
+			},
+		},
+		{
+			"callrelay_events_rejected_total",
+			"Event subscriptions rejected at capacity",
+			func() float64 {
+				return float64(a.dispatcher.Snapshot().Rejected)
+			},
+		},
+		{
+			"callrelay_events_source_failures_total",
+			"Event source failures requiring new subscriptions",
+			func() float64 {
+				return float64(a.dispatcher.Snapshot().Failures)
 			},
 		},
 		{

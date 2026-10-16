@@ -4,14 +4,15 @@ services:
   openvidu:
     image: openvidu/openvidu-server:3.9.0@sha256:21a234c29f35ecc8f7c7c804059167242433c1266ff63f23c60e92848ace072e
     environment:
-      LIVEKIT_KEYS: "${LIVEKIT_API_KEY:-callrelay-dev}: ${LIVEKIT_API_SECRET:-callrelay-development-secret-00000000}"
       LIVEKIT_CONFIG: |
+        keys:
+          callrelay-dev: callrelay-development-secret-00000000
         rtc:
           use_external_ip: false
           tcp_port: 7881
           udp_port: 7882
         webhook:
-          api_key: "${LIVEKIT_API_KEY:-callrelay-dev}"
+          api_key: callrelay-dev
           urls:
             - http://host.docker.internal:19080/webhooks/livekit
     ports:
@@ -30,9 +31,6 @@ services:
   nats:
     image: nats:2.15.1-alpine
     command: --config /etc/nats/nats.conf
-    environment:
-      NATS_USER: ${NATS_USER:-callrelay}
-      NATS_PASSWORD: ${NATS_PASSWORD:-callrelay-dev}
     ports:
     - 127.0.0.1:14222:4222
     volumes:
@@ -56,8 +54,8 @@ configs:
       port: 4222
       http: 127.0.0.1:8222
       authorization {
-        user: $$NATS_USER
-        password: $$NATS_PASSWORD
+        user: callrelay
+        password: callrelay-dev
       }
       jetstream {
         store_dir: /data

@@ -18,6 +18,11 @@ type Event struct {
 	OccurredAt  time.Time
 }
 
+func (e Event) Valid() bool {
+	return e.ID != "" && len(e.ID) <= MaxIdentifierBytes && e.CallID != "" && len(e.CallID) <= MaxIdentifierBytes &&
+		e.Source != "" && len(e.Source) <= MaxEventSourceBytes && !e.OccurredAt.IsZero() && ValidEventType(e.Type)
+}
+
 func ValidEventType(value string) bool {
 	if value == "" || len(value) > MaxEventTypeBytes {
 		return false

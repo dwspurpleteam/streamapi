@@ -33,21 +33,16 @@ type Snapshot struct {
 	Rejected uint64
 }
 
-func New(publisher Publisher, concurrency int, timeout time.Duration) (*Receiver, error) {
-	if publisher == nil {
-		return nil, ErrInvalid
-	}
-
+func New(publisher Publisher, concurrency int, timeout time.Duration) *Receiver {
 	return &Receiver{
 		publisher: publisher,
 		slots:     make(chan struct{}, concurrency),
 		timeout:   timeout,
-	}, nil
+	}
 }
 
 func (r *Receiver) Accept(ctx context.Context, event domain.Event) error {
-	if event.ID == "" || len(event.ID) > domain.MaxIdentifierBytes || event.CallID == "" || len(event.CallID) > domain.MaxIdentifierBytes ||
-		event.Source == "" || len(event.Source) > domain.MaxEventSourceBytes || event.OccurredAt.IsZero() || !domain.ValidEventType(event.Type) {
+	if !event.Valid() {
 		r.rejected.Add(1)
 
 		return ErrInvalid

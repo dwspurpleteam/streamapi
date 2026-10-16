@@ -8,7 +8,10 @@ import (
 	"time"
 
 	"github.com/dwspurpleteam/callrelay/internal/app/callrelay/domain"
+	"github.com/dwspurpleteam/callrelay/pkg/ratelimit"
 )
+
+const cacheIsolationBytes = 128
 
 type Source interface {
 	Run(ctx context.Context, call domain.Call, emit func(domain.Frame), wants func(domain.Track) bool, changed <-chan struct{}) error
@@ -36,7 +39,7 @@ type Manager struct {
 	wg         sync.WaitGroup
 	received   uint64
 	rejected   atomic.Uint64
-	egress     *budget
+	egress     *ratelimit.Limiter
 	nextEgress int
 }
 
@@ -77,18 +80,14 @@ type Snapshot struct {
 	Closed        bool
 }
 
-func New(cfg Config, source Source) (*Manager, error) {
-	if source == nil {
-		return nil, ErrInvalid
-	}
-
+func New(cfg Config, source Source) *Manager {
 	return &Manager{
 		cfg:    cfg,
 		source: source,
 		rooms:  make(map[string]*room),
 
-		egress: newBudget(cfg.EgressBytesPerSecond, cfg.EgressBurstBytes, int64(cfg.QueueBytes), time.Now()),
-	}, nil
+		egress: ratelimit.New(cfg.EgressBytesPerSecond, cfg.EgressBurstBytes, int64(cfg.QueueBytes), time.Now()),
+	}
 }
 
 func (m *Manager) Subscribe(ctx context.Context, call domain.Call, selection domain.Selection) (*Subscription, error) {
@@ -152,7 +151,7 @@ func (m *Manager) Subscribe(ctx context.Context, call domain.Call, selection dom
 		room:        r,
 		egressIndex: m.nextEgress,
 	}
-	m.nextEgress = (m.nextEgress + 1) % len(m.egress.shards)
+	m.nextEgress = (m.nextEgress + 1) % m.egress.Shards()
 
 	r.subs[s] = struct{}{}
 	r.refresh()
@@ -243,7 +242,7 @@ func (s *Subscription) Done() <-chan struct{}                          { return 
 func (s *Subscription) Err() error                                     { return s.q.cause() }
 
 func (s *Subscription) AllowSend(bytes int) bool {
-	return s.manager.egress.allow(bytes, time.Now(), s.egressIndex)
+	return s.manager.egress.Allow(bytes, time.Now(), s.egressIndex)
 }
 
 func (s *Subscription) Close() {

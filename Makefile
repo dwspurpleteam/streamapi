@@ -12,7 +12,7 @@ generate: generate/proto
 .PHONY: generate/proto
 generate/proto: bin/protoc-gen-go bin/protoc-gen-go-grpc
 	@mkdir -p internal/pkg/gen
-	@PATH="$(BIN_PATH):$$PATH" protoc -I proto --go_out=internal/pkg/gen --go_opt=paths=source_relative --go-grpc_out=internal/pkg/gen --go-grpc_opt=paths=source_relative proto/callrelay/v1/media.proto
+	@PATH="$(BIN_PATH):$$PATH" protoc -I proto --go_out=internal/pkg/gen --go_opt=paths=source_relative --go-grpc_out=internal/pkg/gen --go-grpc_opt=paths=source_relative proto/callrelay/v1/*.proto
 
 .PHONY: build
 build: | $(BIN_PATH)
@@ -61,4 +61,3 @@ bin/protoc-gen-go-grpc: $(BIN_PATH)/protoc-gen-go-grpc
 
 $(BIN_PATH)/protoc-gen-go-grpc: | $(BIN_PATH)
 	@GOBIN="$(BIN_PATH)" go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@$(PROTOC_GEN_GO_GRPC_VERSION)
-

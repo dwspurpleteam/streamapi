@@ -19,69 +19,55 @@ import (
 )
 
 type app struct {
-	media     *media.Manager
-	publisher *natsadapter.Publisher
-	events    *events.Receiver
-	webhook   *webhookport.Handler
-	streams   *grpcport.Server
-	grpc      *grpc.Server
-	http      *http.Server
+	media        *media.Manager
+	publisher    *natsadapter.Publisher
+	events       *events.Receiver
+	dispatcher   *events.Dispatcher
+	eventStreams *grpcport.EventServer
+	webhook      *webhookport.Handler
+	streams      *grpcport.Server
+	grpc         *grpc.Server
+	http         *http.Server
 }
 
-func newApp(c *config, keys secrets, logger *slog.Logger) (*app, error) {
-	source, err := livekitadapter.New(c.sourceConfig(keys), logger)
-	if err != nil {
-		return nil, fmt.Errorf("configure media source: %w", err)
-	}
+func newApp(c *config, logger *slog.Logger) (*app, error) {
+	source := livekitadapter.New(c.sourceConfig(), logger)
+	manager := media.New(c.mediaConfig(), source)
 
-	manager, err := media.New(c.mediaConfig(), source)
-	if err != nil {
-		return nil, err
-	}
-
-	publisher, err := natsadapter.New(c.publisherConfig(keys))
+	publisher, err := natsadapter.New(c.publisherConfig())
 	if err != nil {
 		return nil, fmt.Errorf("configure event publisher: %w", err)
 	}
 
-	receiver, hook, err := newWebhook(c, keys, publisher)
-	if err != nil {
-		publisher.Close()
+	receiver := events.New(publisher, c.Events.Concurrency, c.Events.PublishTimeout)
+	verifier := webhooklivekit.NewVerifier(c.LiveKit.APIKey, c.LiveKit.APISecret, c.LiveKit.EventSource, c.LiveKit.EventTypes)
+	hook := webhookport.New(verifier, receiver, c.HTTP.MaxBodyBytes, c.HTTP.Concurrency)
 
-		return nil, err
-	}
+	subscriber := natsadapter.NewSubscriber(publisher, natsadapter.SubscriberConfig{
+		BufferEvents:      c.NATS.ConsumerBufferEvents,
+		BatchBytes:        c.NATS.ConsumerBatchBytes,
+		PullExpiry:        c.NATS.ConsumerPullExpiry,
+		InactiveThreshold: c.NATS.ConsumerInactiveThreshold,
+	}, logger)
+	dispatcher := events.NewDispatcher(c.deliveryConfig(), subscriber)
 
 	app := &app{
-		media:     manager,
-		publisher: publisher,
-		events:    receiver,
-		webhook:   hook,
-		streams:   grpcport.New(manager, c.GRPC.SendTimeout, c.GRPC.LatencyBucketsSeconds, logger),
+		media:        manager,
+		publisher:    publisher,
+		events:       receiver,
+		dispatcher:   dispatcher,
+		eventStreams: grpcport.NewEventServer(dispatcher, c.Events.Delivery.SendTimeout, c.GRPC.LatencyBucketsSeconds, logger),
+		webhook:      hook,
+		streams:      grpcport.New(manager, c.GRPC.SendTimeout, c.GRPC.LatencyBucketsSeconds, logger),
 	}
 
-	app.grpc = newGRPCServer(c.GRPC, app.streams)
+	app.grpc = newGRPCServer(c.GRPC, app.streams, app.eventStreams)
 	app.http = app.newHTTPServer(c.HTTP)
 
 	return app, nil
 }
 
-func newWebhook(c *config, keys secrets, publisher *natsadapter.Publisher) (*events.Receiver, *webhookport.Handler, error) {
-	receiver, err := events.New(publisher, c.Events.Concurrency, c.Events.PublishTimeout)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	verifier := webhooklivekit.NewVerifier(keys.LiveKitKey, keys.LiveKitSecret, c.LiveKit.EventSource, c.LiveKit.EventTypes)
-
-	hook, err := webhookport.New(verifier, receiver, c.HTTP.MaxBodyBytes, c.HTTP.Concurrency)
-	if err != nil {
-		return nil, nil, fmt.Errorf("configure webhook receiver: %w", err)
-	}
-
-	return receiver, hook, nil
-}
-
-func newGRPCServer(c grpcConfig, port *grpcport.Server) *grpc.Server {
+func newGRPCServer(c grpcConfig, port *grpcport.Server, eventPort *grpcport.EventServer) *grpc.Server {
 	rpc := grpc.NewServer(
 		grpc.MaxConcurrentStreams(c.MaxConcurrentStreams),
 		grpc.MaxRecvMsgSize(c.MaxMessageBytes),
@@ -96,8 +82,22 @@ func newGRPCServer(c grpcConfig, port *grpcport.Server) *grpc.Server {
 		}),
 	)
 	pb.RegisterMediaServiceServer(rpc, port)
+	pb.RegisterEventServiceServer(rpc, eventPort)
 
 	return rpc
+}
+
+func (c *config) deliveryConfig() events.DeliveryConfig {
+	return events.DeliveryConfig{
+		MaxSubscriptions: c.Events.Delivery.MaxSubscriptions,
+		MaxPerCall:       c.Events.Delivery.MaxPerCall,
+		MaxFilters:       c.Events.Delivery.MaxFilters,
+		QueueEvents:      c.Events.Delivery.QueueEvents,
+		QueueBytes:       c.Events.Delivery.QueueBytes,
+		QueueAge:         c.Events.Delivery.QueueAge,
+		MaxReservedBytes: c.Events.Delivery.MaxReservedBytes,
+		RetryInterval:    c.NATS.RecoveryInterval,
+	}
 }
 
 func (c *config) mediaConfig() media.Config {
@@ -115,11 +115,11 @@ func (c *config) mediaConfig() media.Config {
 	}
 }
 
-func (c *config) sourceConfig(s secrets) livekitadapter.Config {
+func (c *config) sourceConfig() livekitadapter.Config {
 	return livekitadapter.Config{
 		URL:       c.LiveKit.URL,
-		APIKey:    s.LiveKitKey,
-		APISecret: s.LiveKitSecret,
+		APIKey:    c.LiveKit.APIKey,
+		APISecret: c.LiveKit.APISecret,
 
 		ConnectTimeout: c.LiveKit.ConnectTimeout,
 		ReadTimeout:    c.LiveKit.ReadTimeout,
@@ -130,11 +130,11 @@ func (c *config) sourceConfig(s secrets) livekitadapter.Config {
 	}
 }
 
-func (c *config) publisherConfig(s secrets) natsadapter.Config {
+func (c *config) publisherConfig() natsadapter.Config {
 	return natsadapter.Config{
 		URL:      c.NATS.URL,
-		Username: s.NATSUser,
-		Password: s.NATSPassword,
+		Username: c.NATS.Username,
+		Password: c.NATS.Password,
 		Stream:   c.NATS.Stream,
 		Prefix:   c.NATS.Prefix,
 

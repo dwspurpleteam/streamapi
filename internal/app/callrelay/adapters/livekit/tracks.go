@@ -7,7 +7,6 @@ import (
 	"io"
 	"net"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	lksdk "github.com/livekit/server-sdk-go/v2"
@@ -25,8 +24,8 @@ type trackReaders struct {
 	mu      sync.Mutex
 	wg      sync.WaitGroup
 	closing bool
-	active  atomic.Int64
-	handles atomic.Uint32
+	active  int
+	handles uint32
 }
 
 func (r *trackReaders) subscribe(ctx context.Context, track *webrtc.TrackRemote, pub *lksdk.RemoteTrackPublication, participant *lksdk.RemoteParticipant, emit func(domain.Frame)) {
@@ -37,9 +36,7 @@ func (r *trackReaders) subscribe(ctx context.Context, track *webrtc.TrackRemote,
 		return
 	}
 
-	if r.active.Add(1) > int64(r.source.cfg.MaxTracks) {
-		r.active.Add(-1)
-
+	if r.active >= r.source.cfg.MaxTracks {
 		select {
 		case r.failure <- media.ErrLimit:
 		default:
@@ -48,9 +45,12 @@ func (r *trackReaders) subscribe(ctx context.Context, track *webrtc.TrackRemote,
 		return
 	}
 
+	r.active++
+	r.handles++
+
 	codec := track.Codec()
 	info := domain.Track{
-		Handle:      r.handles.Add(1),
+		Handle:      r.handles,
 		ID:          pub.SID(),
 		Participant: participant.Identity(),
 		Kind:        kind(pub),
@@ -62,7 +62,11 @@ func (r *trackReaders) subscribe(ctx context.Context, track *webrtc.TrackRemote,
 	}
 
 	r.wg.Go(func() {
-		defer r.active.Add(-1)
+		defer func() {
+			r.mu.Lock()
+			r.active--
+			r.mu.Unlock()
+		}()
 		defer func() {
 			emit(domain.Frame{
 				Track:      &info,

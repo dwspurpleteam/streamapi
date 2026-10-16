@@ -1,4 +1,4 @@
-package grpc
+package metrics
 
 import (
 	"fmt"
@@ -9,13 +9,13 @@ import (
 	dto "github.com/prometheus/client_model/go"
 )
 
-type histogram struct {
+type Histogram struct {
 	shards  []prometheus.Histogram
 	created time.Time
 }
 
-func newHistogram(options prometheus.HistogramOpts) *histogram {
-	h := &histogram{
+func NewHistogram(options prometheus.HistogramOpts) *Histogram {
+	h := &Histogram{
 		shards:  make([]prometheus.Histogram, runtime.GOMAXPROCS(0)),
 		created: time.Now(),
 	}
@@ -26,15 +26,15 @@ func newHistogram(options prometheus.HistogramOpts) *histogram {
 	return h
 }
 
-func (h *histogram) observe(index uint64, value float64) {
+func (h *Histogram) Observe(index uint64, value float64) {
 	h.shards[index%uint64(len(h.shards))].Observe(value)
 }
 
-func (h *histogram) Describe(ch chan<- *prometheus.Desc) {
+func (h *Histogram) Describe(ch chan<- *prometheus.Desc) {
 	h.shards[0].Describe(ch)
 }
 
-func (h *histogram) Collect(ch chan<- prometheus.Metric) {
+func (h *Histogram) Collect(ch chan<- prometheus.Metric) {
 	var (
 		count  uint64
 		sum    float64

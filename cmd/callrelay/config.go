@@ -3,10 +3,9 @@ package main
 import (
 	"flag"
 	"fmt"
-	"os"
 	"time"
 
-	configfile "github.com/dwspurpleteam/callrelay/internal/pkg/config"
+	configfile "github.com/dwspurpleteam/callrelay/pkg/config"
 )
 
 type config struct {
@@ -58,12 +57,26 @@ type mediaConfig struct {
 }
 
 type eventsConfig struct {
-	Concurrency    int           `yaml:"concurrency"`
-	PublishTimeout time.Duration `yaml:"publish_timeout"`
+	Concurrency    int            `yaml:"concurrency"`
+	PublishTimeout time.Duration  `yaml:"publish_timeout"`
+	Delivery       deliveryConfig `yaml:"delivery"`
+}
+
+type deliveryConfig struct {
+	MaxSubscriptions int           `yaml:"max_subscriptions"`
+	MaxPerCall       int           `yaml:"max_per_call"`
+	MaxFilters       int           `yaml:"max_filters"`
+	QueueEvents      int           `yaml:"queue_events"`
+	QueueBytes       int           `yaml:"queue_bytes"`
+	QueueAge         time.Duration `yaml:"queue_age"`
+	MaxReservedBytes int64         `yaml:"max_reserved_bytes"`
+	SendTimeout      time.Duration `yaml:"send_timeout"`
 }
 
 type livekitConfig struct {
 	URL            string            `yaml:"url"`
+	APIKey         string            `yaml:"api_key"`
+	APISecret      string            `yaml:"api_secret"`
 	ConnectTimeout time.Duration     `yaml:"connect_timeout"`
 	ReadTimeout    time.Duration     `yaml:"read_timeout"`
 	TokenTTL       time.Duration     `yaml:"token_ttl"`
@@ -74,43 +87,33 @@ type livekitConfig struct {
 }
 
 type natsConfig struct {
-	URL              string        `yaml:"url"`
-	Stream           string        `yaml:"stream"`
-	Prefix           string        `yaml:"prefix"`
-	MaxBytes         int64         `yaml:"max_bytes"`
-	MaxMessageBytes  int32         `yaml:"max_message_bytes"`
-	MaxAge           time.Duration `yaml:"max_age"`
-	DuplicateWindow  time.Duration `yaml:"duplicate_window"`
-	Timeout          time.Duration `yaml:"timeout"`
-	ReconnectWait    time.Duration `yaml:"reconnect_wait"`
-	RecoveryInterval time.Duration `yaml:"recovery_interval"`
+	URL                       string        `yaml:"url"`
+	Username                  string        `yaml:"username"`
+	Password                  string        `yaml:"password"`
+	Stream                    string        `yaml:"stream"`
+	Prefix                    string        `yaml:"prefix"`
+	MaxBytes                  int64         `yaml:"max_bytes"`
+	MaxMessageBytes           int32         `yaml:"max_message_bytes"`
+	MaxAge                    time.Duration `yaml:"max_age"`
+	DuplicateWindow           time.Duration `yaml:"duplicate_window"`
+	Timeout                   time.Duration `yaml:"timeout"`
+	ReconnectWait             time.Duration `yaml:"reconnect_wait"`
+	RecoveryInterval          time.Duration `yaml:"recovery_interval"`
+	ConsumerBatchBytes        int           `yaml:"consumer_batch_bytes"`
+	ConsumerBufferEvents      int           `yaml:"consumer_buffer_events"`
+	ConsumerPullExpiry        time.Duration `yaml:"consumer_pull_expiry"`
+	ConsumerInactiveThreshold time.Duration `yaml:"consumer_inactive_threshold"`
 }
 
-type secrets struct {
-	LiveKitKey    string
-	LiveKitSecret string
-	NATSUser      string
-	NATSPassword  string
-}
-
-func loadConfig() (*config, secrets, error) {
-	configuration := flag.String("config", "configs/local.yaml", "YAML configuration file")
+func loadConfig() (*config, error) {
+	configuration := flag.String("config", "configs/local.yaml", "yaml configuration file")
 
 	flag.Parse()
 
 	var cfg config
 	if err := configfile.Load(*configuration, &cfg); err != nil {
-		return nil, secrets{}, fmt.Errorf("load configuration: %w", err)
+		return nil, fmt.Errorf("load configuration: %w", err)
 	}
 
-	return &cfg, loadSecrets(), nil
-}
-
-func loadSecrets() secrets {
-	return secrets{
-		LiveKitKey:    os.Getenv("LIVEKIT_API_KEY"),
-		LiveKitSecret: os.Getenv("LIVEKIT_API_SECRET"),
-		NATSUser:      os.Getenv("NATS_USER"),
-		NATSPassword:  os.Getenv("NATS_PASSWORD"),
-	}
+	return &cfg, nil
 }

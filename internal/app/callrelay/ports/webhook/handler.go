@@ -10,10 +10,7 @@ import (
 	"github.com/dwspurpleteam/callrelay/internal/app/callrelay/service/events"
 )
 
-var (
-	ErrIgnored      = errors.New("unsupported webhook event")
-	errDependencies = errors.New("missing webhook verifier or receiver")
-)
+var ErrIgnored = errors.New("unsupported webhook event")
 
 type Verifier interface {
 	Verify(request *http.Request) (domain.Event, error)
@@ -33,17 +30,13 @@ type Handler struct {
 	ignored  atomic.Uint64
 }
 
-func New(verifier Verifier, receiver Receiver, maxBytes int64, concurrency int) (*Handler, error) {
-	if verifier == nil || receiver == nil {
-		return nil, errDependencies
-	}
-
+func New(verifier Verifier, receiver Receiver, maxBytes int64, concurrency int) *Handler {
 	return &Handler{
 		verifier: verifier,
 		receiver: receiver,
 		maxBytes: maxBytes,
 		slots:    make(chan struct{}, concurrency),
-	}, nil
+	}
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {

@@ -11,7 +11,7 @@ import (
 )
 
 func run(logger *slog.Logger) error {
-	cfg, keys, err := loadConfig()
+	cfg, err := loadConfig()
 	if err != nil {
 		return err
 	}
@@ -19,7 +19,7 @@ func run(logger *slog.Logger) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	app, err := newApp(cfg, keys, logger)
+	app, err := newApp(cfg, logger)
 	if err != nil {
 		return fmt.Errorf("create callrelay: %w", err)
 	}

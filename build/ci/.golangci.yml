@@ -50,6 +50,11 @@ linters:
           disabled: true
     depguard:
       rules:
+        shared:
+          files: ["**/pkg/**.go"]
+          deny:
+            - pkg: github.com/dwspurpleteam/callrelay/internal
+            - pkg: github.com/dwspurpleteam/callrelay/cmd
         domain:
           files: ["**/internal/app/callrelay/domain/**.go"]
           list-mode: strict
@@ -60,6 +65,7 @@ linters:
           allow:
             - $gostd
             - github.com/dwspurpleteam/callrelay/internal/app/callrelay/domain$
+            - github.com/dwspurpleteam/callrelay/pkg/ratelimit$
         events:
           files: ["**/internal/app/callrelay/service/events/**.go"]
           list-mode: strict
@@ -71,7 +77,6 @@ linters:
           deny:
             - pkg: github.com/dwspurpleteam/callrelay/internal/app/callrelay/adapters
             - pkg: github.com/dwspurpleteam/callrelay/internal/app/callrelay/ports/webhook
-            - pkg: github.com/dwspurpleteam/callrelay/internal/app/callrelay/service/events
         webhook:
           files: ["**/internal/app/callrelay/ports/webhook/**.go"]
           deny:
@@ -147,7 +152,7 @@ linters:
       - path: internal/app/callrelay/service/media/manager\.go$
         text: Non-inherited new context
         linters: [contextcheck]
-      - path: internal/pkg/listener/listener\.go$
+      - path: pkg/listener/listener\.go$
         linters: [wrapcheck]
     paths:
       - _easyjson.go

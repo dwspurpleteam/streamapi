@@ -1,4 +1,4 @@
-package media
+package ratelimit
 
 import (
 	"math"
@@ -9,7 +9,7 @@ import (
 
 const cacheIsolationBytes = 128
 
-type budget struct {
+type Limiter struct {
 	shards []bucket
 }
 
@@ -22,25 +22,25 @@ type bucket struct {
 	_        [cacheIsolationBytes]byte
 }
 
-func newBudget(rate, burst, packetBytes int64, now time.Time) *budget {
-	count := min(int64(runtime.GOMAXPROCS(0)), rate, max(1, burst/packetBytes))
+func New(rate, burst, quantum int64, now time.Time) *Limiter {
+	count := min(int64(runtime.GOMAXPROCS(0)), rate, max(1, burst/quantum))
 
-	b := &budget{shards: make([]bucket, count)}
+	b := &Limiter{shards: make([]bucket, count)}
 	for i := range b.shards {
 		shard := &b.shards[i]
 		shard.rate = float64(rate / count)
-		shard.burst = float64((burst / packetBytes / count) * packetBytes)
+		shard.burst = float64((burst / quantum / count) * quantum)
 
 		if int64(i) < rate%count {
 			shard.rate++
 		}
 
-		if int64(i) < (burst/packetBytes)%count {
-			shard.burst += float64(packetBytes)
+		if int64(i) < (burst/quantum)%count {
+			shard.burst += float64(quantum)
 		}
 
 		if i == 0 {
-			shard.burst += float64(burst % packetBytes)
+			shard.burst += float64(burst % quantum)
 		}
 
 		shard.start = now
@@ -50,9 +50,9 @@ func newBudget(rate, burst, packetBytes int64, now time.Time) *budget {
 	return b
 }
 
-func (b *budget) allow(bytes int, now time.Time, index int) bool {
+func (b *Limiter) Allow(units int, now time.Time, index int) bool {
 	for range len(b.shards) {
-		if b.shards[index].allow(bytes, now) {
+		if b.shards[index].allow(units, now) {
 			return true
 		}
 
@@ -65,12 +65,12 @@ func (b *budget) allow(bytes int, now time.Time, index int) bool {
 	return false
 }
 
-func (b *bucket) allow(bytes int, now time.Time) bool {
-	if bytes < 0 || float64(bytes) > b.burst {
+func (b *bucket) allow(units int, now time.Time) bool {
+	if units < 0 || float64(units) > b.burst {
 		return false
 	}
 
-	if bytes == 0 {
+	if units == 0 {
 		return true
 	}
 
@@ -80,14 +80,14 @@ func (b *bucket) allow(bytes int, now time.Time) bool {
 	previous := b.consumed.Load()
 	for {
 		consumed := math.Float64frombits(previous)
-		if consumed > floor && float64(bytes) > available-consumed {
+		if consumed > floor && float64(units) > available-consumed {
 			return false
 		}
 
 		base := max(consumed, floor)
 
-		next := base + float64(bytes)
-		if next-base < float64(bytes) {
+		next := base + float64(units)
+		if next-base < float64(units) {
 			next = math.Nextafter(next, math.Inf(1))
 		}
 
@@ -101,4 +101,8 @@ func (b *bucket) allow(bytes int, now time.Time) bool {
 
 		previous = b.consumed.Load()
 	}
+}
+
+func (b *Limiter) Shards() int {
+	return len(b.shards)
 }

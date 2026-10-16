@@ -1,6 +1,9 @@
 package grpc
 
-import "sync/atomic"
+import (
+	"sync"
+	"sync/atomic"
+)
 
 const cacheIsolationBytes = 128
 
@@ -12,24 +15,59 @@ type deliveryCounters struct {
 	_         [cacheIsolationBytes]byte
 }
 
-func (s *Server) startCounters() *deliveryCounters {
+type counterSet struct {
+	mu            sync.Mutex
+	active        map[*deliveryCounters]struct{}
+	nextHistogram uint64
+	sent          uint64
+	bytes         uint64
+}
+
+type Snapshot struct {
+	Sent  uint64
+	Bytes uint64
+	Slow  uint64
+}
+
+func (s *counterSet) start() *deliveryCounters {
 	counters := &deliveryCounters{}
 
-	s.countersMu.Lock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.active == nil {
+		s.active = make(map[*deliveryCounters]struct{})
+	}
+
 	counters.histogram = s.nextHistogram
 	s.nextHistogram++
-	s.counters[counters] = struct{}{}
-	s.countersMu.Unlock()
+	s.active[counters] = struct{}{}
 
 	return counters
 }
 
-func (s *Server) stopCounters(counters *deliveryCounters) {
-	s.countersMu.Lock()
-	defer s.countersMu.Unlock()
+func (s *counterSet) stop(counters *deliveryCounters) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	s.sent += counters.sent.Load()
 	s.bytes += counters.bytes.Load()
 
-	delete(s.counters, counters)
+	delete(s.active, counters)
+}
+
+func (s *counterSet) snapshot() Snapshot {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	result := Snapshot{
+		Sent:  s.sent,
+		Bytes: s.bytes,
+	}
+	for counters := range s.active {
+		result.Sent += counters.sent.Load()
+		result.Bytes += counters.bytes.Load()
+	}
+
+	return result
 }

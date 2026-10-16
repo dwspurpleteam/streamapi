@@ -66,14 +66,14 @@ func New(cfg Config) (*Publisher, error) {
 
 	connection, err := broker.Connect(cfg.URL, opts...)
 	if err != nil {
-		return nil, fmt.Errorf("connect NATS: %w", err)
+		return nil, fmt.Errorf("connect nats: %w", err)
 	}
 
 	js, err := jetstream.New(connection)
 	if err != nil {
 		connection.Close()
 
-		return nil, fmt.Errorf("create JetStream client: %w", err)
+		return nil, fmt.Errorf("create jetstream client: %w", err)
 	}
 
 	return &Publisher{

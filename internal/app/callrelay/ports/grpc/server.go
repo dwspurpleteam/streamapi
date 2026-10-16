@@ -18,44 +18,40 @@ import (
 	"github.com/dwspurpleteam/callrelay/internal/app/callrelay/domain"
 	"github.com/dwspurpleteam/callrelay/internal/app/callrelay/service/media"
 	pb "github.com/dwspurpleteam/callrelay/internal/pkg/gen/callrelay/v1"
+	"github.com/dwspurpleteam/callrelay/pkg/metrics"
 )
 
 type Server struct {
 	pb.UnimplementedMediaServiceServer
 
-	manager       *media.Manager
-	timeout       time.Duration
-	logger        *slog.Logger
-	wg            sync.WaitGroup
-	countersMu    sync.Mutex
-	counters      map[*deliveryCounters]struct{}
-	nextHistogram uint64
-	sent          uint64
-	bytes         uint64
-	slow          atomic.Uint64
-	queueAge      *histogram
-	sendDuration  *histogram
+	manager      *media.Manager
+	timeout      time.Duration
+	logger       *slog.Logger
+	wg           sync.WaitGroup
+	counters     counterSet
+	slow         atomic.Uint64
+	queueAge     *metrics.Histogram
+	sendDuration *metrics.Histogram
 }
 
 func New(manager *media.Manager, timeout time.Duration, buckets []float64, logger *slog.Logger) *Server {
 	buckets = slices.Clone(buckets)
 
 	return &Server{
-		manager:  manager,
-		timeout:  timeout,
-		logger:   logger,
-		counters: make(map[*deliveryCounters]struct{}),
+		manager: manager,
+		timeout: timeout,
+		logger:  logger,
 
-		queueAge: newHistogram(prometheus.HistogramOpts{
+		queueAge: metrics.NewHistogram(prometheus.HistogramOpts{
 			Name: "callrelay_media_queue_age_seconds",
 			Help: "Media frame age after leaving the subscriber queue",
 
 			Buckets: buckets,
 		}),
 
-		sendDuration: newHistogram(prometheus.HistogramOpts{
+		sendDuration: metrics.NewHistogram(prometheus.HistogramOpts{
 			Name: "callrelay_media_send_seconds",
-			Help: "Time spent in gRPC Send, excluding receiver acknowledgement",
+			Help: "Time spent in grpc send, excluding receiver acknowledgement",
 
 			Buckets: buckets,
 		}),
@@ -91,7 +87,7 @@ func (s *Server) Subscribe(request *pb.SubscribeRequest, stream rpc.ServerStream
 	defer s.logger.Info("media subscription stopped", "call_id", request.GetCallId())
 
 	result := make(chan error, 1)
-	counters := s.startCounters()
+	counters := s.counters.start()
 	s.wg.Go(func() {
 		result <- s.send(stream, subscription, counters)
 	})
@@ -129,7 +125,7 @@ func (s *Server) Subscribe(request *pb.SubscribeRequest, stream rpc.ServerStream
 }
 
 func (s *Server) send(stream rpc.ServerStreamingServer[pb.SubscribeResponse], sub *media.Subscription, counters *deliveryCounters) error {
-	defer s.stopCounters(counters)
+	defer s.counters.stop(counters)
 
 	known := make(map[uint32]struct{})
 
@@ -140,7 +136,7 @@ func (s *Server) send(stream rpc.ServerStreamingServer[pb.SubscribeResponse], su
 		err := stream.Send(message)
 
 		counters.sending.Store(0)
-		s.sendDuration.observe(counters.histogram, time.Since(start).Seconds())
+		s.sendDuration.Observe(counters.histogram, time.Since(start).Seconds())
 
 		if err != nil {
 			return fmt.Errorf("send media response: %w", err)
@@ -157,7 +153,7 @@ func (s *Server) send(stream rpc.ServerStreamingServer[pb.SubscribeResponse], su
 
 		t := frame.Track
 
-		s.queueAge.observe(counters.histogram, time.Since(frame.ReceivedAt).Seconds())
+		s.queueAge.Observe(counters.histogram, time.Since(frame.ReceivedAt).Seconds())
 
 		if frame.Ended {
 			if _, exists := known[t.Handle]; !exists {
@@ -254,25 +250,9 @@ func rpcError(err error) error {
 	}
 }
 
-type Snapshot struct {
-	Sent  uint64
-	Bytes uint64
-	Slow  uint64
-}
-
 func (s *Server) Snapshot() Snapshot {
-	s.countersMu.Lock()
-	defer s.countersMu.Unlock()
-
-	result := Snapshot{
-		Sent:  s.sent,
-		Bytes: s.bytes,
-		Slow:  s.slow.Load(),
-	}
-	for counters := range s.counters {
-		result.Sent += counters.sent.Load()
-		result.Bytes += counters.bytes.Load()
-	}
+	result := s.counters.snapshot()
+	result.Slow = s.slow.Load()
 
 	return result
 }
