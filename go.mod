@@ -1,6 +1,6 @@
 module github.com/dwspurpleteam/streamapi
 
-go 1.27.2
+go 1.27.3
 
 require (
 	github.com/livekit/protocol v1.51.1-0.20260910121219-271d9cde3897
