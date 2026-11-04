@@ -5,9 +5,11 @@ import (
 	"log/slog"
 	"net/http"
 
+	lksdk "github.com/livekit/server-sdk-go/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 
+	"github.com/dwspurpleteam/streamapi/internal/app/actions"
 	natsadapter "github.com/dwspurpleteam/streamapi/internal/app/events/adapters/nats"
 	eventsgrpc "github.com/dwspurpleteam/streamapi/internal/app/events/ports/grpc"
 	webhookport "github.com/dwspurpleteam/streamapi/internal/app/events/ports/webhook"
@@ -86,13 +88,19 @@ func newApp(c *config, logger *slog.Logger) (*app, error) {
 		),
 	}
 
-	app.grpc = newGRPCServer(c.GRPC, app.streams, app.eventStreams)
+	callActions := actions.New(
+		c.Actions.ManagerURL,
+		c.Actions.Token,
+		http.DefaultClient,
+		lksdk.NewRoomServiceClient(c.LiveKit.URL, c.LiveKit.APIKey, c.LiveKit.APISecret),
+	)
+	app.grpc = newGRPCServer(c.GRPC, app.streams, app.eventStreams, callActions)
 	app.http = app.newHTTPServer(c.HTTP)
 
 	return app, nil
 }
 
-func newGRPCServer(c grpcConfig, port *mediagrpc.Server, eventPort *eventsgrpc.Server) *grpc.Server {
+func newGRPCServer(c grpcConfig, port *mediagrpc.Server, eventPort *eventsgrpc.Server, actionPort *actions.Server) *grpc.Server {
 	rpc := grpc.NewServer(
 		grpc.MaxConcurrentStreams(c.MaxConcurrentStreams),
 		grpc.MaxRecvMsgSize(c.MaxMessageBytes),
@@ -108,6 +116,7 @@ func newGRPCServer(c grpcConfig, port *mediagrpc.Server, eventPort *eventsgrpc.S
 	)
 	pb.RegisterMediaServiceServer(rpc, port)
 	pb.RegisterEventServiceServer(rpc, eventPort)
+	pb.RegisterActionServiceServer(rpc, actionPort)
 
 	return rpc
 }

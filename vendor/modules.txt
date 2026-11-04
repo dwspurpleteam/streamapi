@@ -505,6 +505,7 @@ google.golang.org/grpc/serviceconfig
 google.golang.org/grpc/stats
 google.golang.org/grpc/status
 google.golang.org/grpc/tap
+google.golang.org/grpc/test/bufconn
 # google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.6.2
 ## explicit; go 1.25.0
 google.golang.org/grpc/cmd/protoc-gen-go-grpc
