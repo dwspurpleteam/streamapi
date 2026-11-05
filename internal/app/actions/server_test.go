@@ -73,8 +73,8 @@ func TestGRPCMuteMicrophone(t *testing.T) {
 
 	ctx := metadata.AppendToOutgoingContext(context.Background(), "authorization", testAuthorization)
 
-	_, err = pb.NewActionServiceClient(conn).MuteMicrophone(ctx, &pb.MuteMicrophoneRequest{
-		ActivationId: testActivation, CallId: testCall, ParticipantId: testParticipant,
+	_, err = pb.NewActionServiceClient(conn).SendEvent(ctx, &pb.SendEventRequest{
+		ActivationId: testActivation, CallId: testCall, ParticipantIds: []string{testParticipant}, EventName: muteMicrophoneEvent,
 	})
 	if err != nil || len(room.muted) != 1 {
 		t.Fatalf("mute failed: %v, tracks: %v", err, room.muted)
@@ -275,7 +275,7 @@ func TestMuteMicrophone(t *testing.T) {
 			server := New(manager.URL, "secret", manager.Client(), room)
 			ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", tc.token))
 
-			_, err := server.MuteMicrophone(ctx, &pb.MuteMicrophoneRequest{ActivationId: activation, CallId: tc.call, ParticipantId: testParticipant})
+			_, err := server.SendEvent(ctx, &pb.SendEventRequest{ActivationId: activation, CallId: tc.call, ParticipantIds: []string{testParticipant}, EventName: muteMicrophoneEvent})
 			if got := status.Code(err); got != tc.want {
 				t.Fatalf("code = %v, want %v: %v", got, tc.want, err)
 			}

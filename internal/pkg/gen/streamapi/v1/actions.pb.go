@@ -21,102 +21,6 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type MuteMicrophoneRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	CallId        string                 `protobuf:"bytes,1,opt,name=call_id,json=callId,proto3" json:"call_id,omitempty"`
-	ActivationId  string                 `protobuf:"bytes,2,opt,name=activation_id,json=activationId,proto3" json:"activation_id,omitempty"`
-	ParticipantId string                 `protobuf:"bytes,3,opt,name=participant_id,json=participantId,proto3" json:"participant_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *MuteMicrophoneRequest) Reset() {
-	*x = MuteMicrophoneRequest{}
-	mi := &file_streamapi_v1_actions_proto_msgTypes[0]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *MuteMicrophoneRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*MuteMicrophoneRequest) ProtoMessage() {}
-
-func (x *MuteMicrophoneRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_streamapi_v1_actions_proto_msgTypes[0]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use MuteMicrophoneRequest.ProtoReflect.Descriptor instead.
-func (*MuteMicrophoneRequest) Descriptor() ([]byte, []int) {
-	return file_streamapi_v1_actions_proto_rawDescGZIP(), []int{0}
-}
-
-func (x *MuteMicrophoneRequest) GetCallId() string {
-	if x != nil {
-		return x.CallId
-	}
-	return ""
-}
-
-func (x *MuteMicrophoneRequest) GetActivationId() string {
-	if x != nil {
-		return x.ActivationId
-	}
-	return ""
-}
-
-func (x *MuteMicrophoneRequest) GetParticipantId() string {
-	if x != nil {
-		return x.ParticipantId
-	}
-	return ""
-}
-
-type MuteMicrophoneResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *MuteMicrophoneResponse) Reset() {
-	*x = MuteMicrophoneResponse{}
-	mi := &file_streamapi_v1_actions_proto_msgTypes[1]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *MuteMicrophoneResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*MuteMicrophoneResponse) ProtoMessage() {}
-
-func (x *MuteMicrophoneResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_streamapi_v1_actions_proto_msgTypes[1]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use MuteMicrophoneResponse.ProtoReflect.Descriptor instead.
-func (*MuteMicrophoneResponse) Descriptor() ([]byte, []int) {
-	return file_streamapi_v1_actions_proto_rawDescGZIP(), []int{1}
-}
-
 type SendEventRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	CallId         string                 `protobuf:"bytes,1,opt,name=call_id,json=callId,proto3" json:"call_id,omitempty"`
@@ -130,7 +34,7 @@ type SendEventRequest struct {
 
 func (x *SendEventRequest) Reset() {
 	*x = SendEventRequest{}
-	mi := &file_streamapi_v1_actions_proto_msgTypes[2]
+	mi := &file_streamapi_v1_actions_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -142,7 +46,7 @@ func (x *SendEventRequest) String() string {
 func (*SendEventRequest) ProtoMessage() {}
 
 func (x *SendEventRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_streamapi_v1_actions_proto_msgTypes[2]
+	mi := &file_streamapi_v1_actions_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -155,7 +59,7 @@ func (x *SendEventRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SendEventRequest.ProtoReflect.Descriptor instead.
 func (*SendEventRequest) Descriptor() ([]byte, []int) {
-	return file_streamapi_v1_actions_proto_rawDescGZIP(), []int{2}
+	return file_streamapi_v1_actions_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *SendEventRequest) GetCallId() string {
@@ -201,7 +105,7 @@ type SendEventResponse struct {
 
 func (x *SendEventResponse) Reset() {
 	*x = SendEventResponse{}
-	mi := &file_streamapi_v1_actions_proto_msgTypes[3]
+	mi := &file_streamapi_v1_actions_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -213,7 +117,7 @@ func (x *SendEventResponse) String() string {
 func (*SendEventResponse) ProtoMessage() {}
 
 func (x *SendEventResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_streamapi_v1_actions_proto_msgTypes[3]
+	mi := &file_streamapi_v1_actions_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -226,19 +130,14 @@ func (x *SendEventResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SendEventResponse.ProtoReflect.Descriptor instead.
 func (*SendEventResponse) Descriptor() ([]byte, []int) {
-	return file_streamapi_v1_actions_proto_rawDescGZIP(), []int{3}
+	return file_streamapi_v1_actions_proto_rawDescGZIP(), []int{1}
 }
 
 var File_streamapi_v1_actions_proto protoreflect.FileDescriptor
 
 const file_streamapi_v1_actions_proto_rawDesc = "" +
 	"\n" +
-	"\x1astreamapi/v1/actions.proto\x12\fstreamapi.v1\"|\n" +
-	"\x15MuteMicrophoneRequest\x12\x17\n" +
-	"\acall_id\x18\x01 \x01(\tR\x06callId\x12#\n" +
-	"\ractivation_id\x18\x02 \x01(\tR\factivationId\x12%\n" +
-	"\x0eparticipant_id\x18\x03 \x01(\tR\rparticipantId\"\x18\n" +
-	"\x16MuteMicrophoneResponse\"\xac\x01\n" +
+	"\x1astreamapi/v1/actions.proto\x12\fstreamapi.v1\"\xac\x01\n" +
 	"\x10SendEventRequest\x12\x17\n" +
 	"\acall_id\x18\x01 \x01(\tR\x06callId\x12#\n" +
 	"\ractivation_id\x18\x02 \x01(\tR\factivationId\x12\x1d\n" +
@@ -246,9 +145,8 @@ const file_streamapi_v1_actions_proto_rawDesc = "" +
 	"event_name\x18\x03 \x01(\tR\teventName\x12'\n" +
 	"\x0fparticipant_ids\x18\x04 \x03(\tR\x0eparticipantIds\x12\x12\n" +
 	"\x04data\x18\x05 \x01(\tR\x04data\"\x13\n" +
-	"\x11SendEventResponse2\xba\x01\n" +
-	"\rActionService\x12[\n" +
-	"\x0eMuteMicrophone\x12#.streamapi.v1.MuteMicrophoneRequest\x1a$.streamapi.v1.MuteMicrophoneResponse\x12L\n" +
+	"\x11SendEventResponse2]\n" +
+	"\rActionService\x12L\n" +
 	"\tSendEvent\x12\x1e.streamapi.v1.SendEventRequest\x1a\x1f.streamapi.v1.SendEventResponseBNZLgithub.com/dwspurpleteam/streamapi/internal/pkg/gen/streamapi/v1;streamapiv1b\x06proto3"
 
 var (
@@ -263,20 +161,16 @@ func file_streamapi_v1_actions_proto_rawDescGZIP() []byte {
 	return file_streamapi_v1_actions_proto_rawDescData
 }
 
-var file_streamapi_v1_actions_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_streamapi_v1_actions_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
 var file_streamapi_v1_actions_proto_goTypes = []any{
-	(*MuteMicrophoneRequest)(nil),  // 0: streamapi.v1.MuteMicrophoneRequest
-	(*MuteMicrophoneResponse)(nil), // 1: streamapi.v1.MuteMicrophoneResponse
-	(*SendEventRequest)(nil),       // 2: streamapi.v1.SendEventRequest
-	(*SendEventResponse)(nil),      // 3: streamapi.v1.SendEventResponse
+	(*SendEventRequest)(nil),  // 0: streamapi.v1.SendEventRequest
+	(*SendEventResponse)(nil), // 1: streamapi.v1.SendEventResponse
 }
 var file_streamapi_v1_actions_proto_depIdxs = []int32{
-	0, // 0: streamapi.v1.ActionService.MuteMicrophone:input_type -> streamapi.v1.MuteMicrophoneRequest
-	2, // 1: streamapi.v1.ActionService.SendEvent:input_type -> streamapi.v1.SendEventRequest
-	1, // 2: streamapi.v1.ActionService.MuteMicrophone:output_type -> streamapi.v1.MuteMicrophoneResponse
-	3, // 3: streamapi.v1.ActionService.SendEvent:output_type -> streamapi.v1.SendEventResponse
-	2, // [2:4] is the sub-list for method output_type
-	0, // [0:2] is the sub-list for method input_type
+	0, // 0: streamapi.v1.ActionService.SendEvent:input_type -> streamapi.v1.SendEventRequest
+	1, // 1: streamapi.v1.ActionService.SendEvent:output_type -> streamapi.v1.SendEventResponse
+	1, // [1:2] is the sub-list for method output_type
+	0, // [0:1] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
 	0, // [0:0] is the sub-list for extension extendee
 	0, // [0:0] is the sub-list for field type_name
@@ -293,7 +187,7 @@ func file_streamapi_v1_actions_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_streamapi_v1_actions_proto_rawDesc), len(file_streamapi_v1_actions_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   2,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

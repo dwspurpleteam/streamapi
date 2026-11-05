@@ -58,19 +58,6 @@ func New(managerURL, token string, client *http.Client, rooms rooms) *Server {
 	return &Server{managerURL: strings.TrimRight(managerURL, "/"), token: token, client: client, rooms: rooms}
 }
 
-// MuteMicrophone is retained for clients using the first version of the API.
-func (s *Server) MuteMicrophone(ctx context.Context, req *pb.MuteMicrophoneRequest) (*pb.MuteMicrophoneResponse, error) {
-	_, err := s.SendEvent(ctx, &pb.SendEventRequest{
-		CallId: req.GetCallId(), ActivationId: req.GetActivationId(),
-		EventName: muteMicrophoneEvent, ParticipantIds: []string{req.GetParticipantId()},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return &pb.MuteMicrophoneResponse{}, nil
-}
-
 func (s *Server) SendEvent(ctx context.Context, req *pb.SendEventRequest) (*pb.SendEventResponse, error) {
 	if s.managerURL == "" || s.token == "" {
 		return nil, status.Error(codes.Unavailable, "plugin actions are not configured")

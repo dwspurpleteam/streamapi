@@ -5,17 +5,8 @@ package streamapi.v1;
 option go_package = "github.com/dwspurpleteam/streamapi/internal/pkg/gen/streamapi/v1;streamapiv1";
 
 service ActionService {
-  rpc MuteMicrophone(MuteMicrophoneRequest) returns (MuteMicrophoneResponse);
   rpc SendEvent(SendEventRequest) returns (SendEventResponse);
 }
-
-message MuteMicrophoneRequest {
-  string call_id = 1;
-  string activation_id = 2;
-  string participant_id = 3;
-}
-
-message MuteMicrophoneResponse {}
 
 message SendEventRequest {
   string call_id = 1;
