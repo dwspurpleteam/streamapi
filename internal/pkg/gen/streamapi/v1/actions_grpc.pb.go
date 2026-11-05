@@ -20,6 +20,7 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	ActionService_MuteMicrophone_FullMethodName = "/streamapi.v1.ActionService/MuteMicrophone"
+	ActionService_SendEvent_FullMethodName      = "/streamapi.v1.ActionService/SendEvent"
 )
 
 // ActionServiceClient is the client API for ActionService service.
@@ -27,6 +28,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ActionServiceClient interface {
 	MuteMicrophone(ctx context.Context, in *MuteMicrophoneRequest, opts ...grpc.CallOption) (*MuteMicrophoneResponse, error)
+	SendEvent(ctx context.Context, in *SendEventRequest, opts ...grpc.CallOption) (*SendEventResponse, error)
 }
 
 type actionServiceClient struct {
@@ -47,11 +49,22 @@ func (c *actionServiceClient) MuteMicrophone(ctx context.Context, in *MuteMicrop
 	return out, nil
 }
 
+func (c *actionServiceClient) SendEvent(ctx context.Context, in *SendEventRequest, opts ...grpc.CallOption) (*SendEventResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SendEventResponse)
+	err := c.cc.Invoke(ctx, ActionService_SendEvent_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ActionServiceServer is the server API for ActionService service.
 // All implementations must embed UnimplementedActionServiceServer
 // for forward compatibility.
 type ActionServiceServer interface {
 	MuteMicrophone(context.Context, *MuteMicrophoneRequest) (*MuteMicrophoneResponse, error)
+	SendEvent(context.Context, *SendEventRequest) (*SendEventResponse, error)
 	mustEmbedUnimplementedActionServiceServer()
 }
 
@@ -64,6 +77,9 @@ type UnimplementedActionServiceServer struct{}
 
 func (UnimplementedActionServiceServer) MuteMicrophone(context.Context, *MuteMicrophoneRequest) (*MuteMicrophoneResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method MuteMicrophone not implemented")
+}
+func (UnimplementedActionServiceServer) SendEvent(context.Context, *SendEventRequest) (*SendEventResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SendEvent not implemented")
 }
 func (UnimplementedActionServiceServer) mustEmbedUnimplementedActionServiceServer() {}
 func (UnimplementedActionServiceServer) testEmbeddedByValue()                       {}
@@ -104,6 +120,24 @@ func _ActionService_MuteMicrophone_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ActionService_SendEvent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SendEventRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ActionServiceServer).SendEvent(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ActionService_SendEvent_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ActionServiceServer).SendEvent(ctx, req.(*SendEventRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ActionService_ServiceDesc is the grpc.ServiceDesc for ActionService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -114,6 +148,10 @@ var ActionService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "MuteMicrophone",
 			Handler:    _ActionService_MuteMicrophone_Handler,
+		},
+		{
+			MethodName: "SendEvent",
+			Handler:    _ActionService_SendEvent_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -2,6 +2,7 @@ package actions
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -22,12 +23,14 @@ import (
 
 type fakeRooms struct {
 	muted   []*livekit.MuteRoomTrackRequest
+	sent    []*livekit.SendDataRequest
 	missing bool
 }
 
 const (
 	testCall          = "RM_call"
 	testActive        = "ACTIVE"
+	testEventName     = "subtitle.updated"
 	testParticipant   = "alice"
 	testAuthorization = "Bearer secret"
 )
@@ -93,6 +96,78 @@ func (f *fakeRooms) MutePublishedTrack(_ context.Context, req *livekit.MuteRoomT
 	f.muted = append(f.muted, req)
 
 	return &livekit.MuteRoomTrackResponse{}, nil
+}
+
+func (f *fakeRooms) SendData(_ context.Context, req *livekit.SendDataRequest) (*livekit.SendDataResponse, error) {
+	f.sent = append(f.sent, req)
+
+	return &livekit.SendDataResponse{}, nil
+}
+
+func TestSendEvent(t *testing.T) {
+	manager := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = fmt.Fprint(w, `{"callId":"RM_call","state":"ACTIVE"}`)
+	}))
+	defer manager.Close()
+
+	room := &fakeRooms{}
+	server := New(manager.URL, "secret", manager.Client(), room)
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", testAuthorization))
+
+	request := &pb.SendEventRequest{
+		CallId: testCall, ActivationId: "11111111-1111-4111-8111-111111111111",
+		EventName: testEventName, ParticipantIds: []string{testParticipant}, Data: "hello",
+	}
+	if _, err := server.SendEvent(ctx, request); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(room.sent) != 1 || room.sent[0].GetTopic() != pluginEventTopic || room.sent[0].GetKind() != livekit.DataPacket_RELIABLE {
+		t.Fatalf("unexpected sent events: %v", room.sent)
+	}
+
+	var envelope struct {
+		ActivationID string `json:"activationId"`
+		CallID       string `json:"callId"`
+		Name         string `json:"name"`
+		Data         string `json:"data"`
+	}
+	if err := json.Unmarshal(room.sent[0].GetData(), &envelope); err != nil {
+		t.Fatal(err)
+	}
+
+	if envelope.ActivationID != request.GetActivationId() || envelope.CallID != testCall ||
+		envelope.Name != testEventName || envelope.Data != "hello" ||
+		len(room.sent[0].GetDestinationIdentities()) != 1 || room.sent[0].GetDestinationIdentities()[0] != testParticipant {
+		t.Fatalf("unexpected envelope: %+v", envelope)
+	}
+
+	request.EventName = muteMicrophoneEvent
+
+	request.Data = ""
+	if _, err := server.SendEvent(ctx, request); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(room.muted) != 1 || len(room.sent) != 1 {
+		t.Fatal("microphone event must mute, not send data")
+	}
+
+	request.ParticipantIds = nil
+	if _, err := server.SendEvent(ctx, request); status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("empty recipients: %v", err)
+	}
+
+	request.EventName = testEventName
+
+	request.ParticipantIds = []string{"other"}
+	if _, err := server.SendEvent(ctx, request); status.Code(err) != codes.NotFound {
+		t.Fatalf("unknown recipient: %v", err)
+	}
+
+	if len(room.sent) != 1 {
+		t.Fatal("event was sent to an unknown recipient")
+	}
 }
 
 func TestMuteMicrophone(t *testing.T) {

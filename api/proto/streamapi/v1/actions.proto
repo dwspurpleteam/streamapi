@@ -6,6 +6,7 @@ option go_package = "github.com/dwspurpleteam/streamapi/internal/pkg/gen/streama
 
 service ActionService {
   rpc MuteMicrophone(MuteMicrophoneRequest) returns (MuteMicrophoneResponse);
+  rpc SendEvent(SendEventRequest) returns (SendEventResponse);
 }
 
 message MuteMicrophoneRequest {
@@ -15,3 +16,13 @@ message MuteMicrophoneRequest {
 }
 
 message MuteMicrophoneResponse {}
+
+message SendEventRequest {
+  string call_id = 1;
+  string activation_id = 2;
+  string event_name = 3;
+  repeated string participant_ids = 4;
+  string data = 5;
+}
+
+message SendEventResponse {}

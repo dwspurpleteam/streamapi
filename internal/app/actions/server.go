@@ -23,14 +23,20 @@ import (
 )
 
 const (
-	actionTimeout      = 10 * time.Second
-	maxManagerResponse = 64 * 1024
+	actionTimeout       = 10 * time.Second
+	maxManagerResponse  = 64 * 1024
+	maxEventBytes       = 15 * 1024
+	maxRecipients       = 64
+	pluginEventTopic    = "plugin.event.v1"
+	muteMicrophoneEvent = "microphone.mute"
 )
 
+//nolint:interfacebloat // The LiveKit operations needed to deliver events and actions.
 type rooms interface {
 	ListRooms(ctx context.Context, req *livekit.ListRoomsRequest) (*livekit.ListRoomsResponse, error)
 	GetParticipant(ctx context.Context, req *livekit.RoomParticipantIdentity) (*livekit.ParticipantInfo, error)
 	MutePublishedTrack(ctx context.Context, req *livekit.MuteRoomTrackRequest) (*livekit.MuteRoomTrackResponse, error)
+	SendData(ctx context.Context, req *livekit.SendDataRequest) (*livekit.SendDataResponse, error)
 }
 
 type Server struct {
@@ -46,7 +52,20 @@ func New(managerURL, token string, client *http.Client, rooms rooms) *Server {
 	return &Server{managerURL: strings.TrimRight(managerURL, "/"), token: token, client: client, rooms: rooms}
 }
 
+// MuteMicrophone is retained for clients using the first version of the API.
 func (s *Server) MuteMicrophone(ctx context.Context, req *pb.MuteMicrophoneRequest) (*pb.MuteMicrophoneResponse, error) {
+	_, err := s.SendEvent(ctx, &pb.SendEventRequest{
+		CallId: req.GetCallId(), ActivationId: req.GetActivationId(),
+		EventName: muteMicrophoneEvent, ParticipantIds: []string{req.GetParticipantId()},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.MuteMicrophoneResponse{}, nil
+}
+
+func (s *Server) SendEvent(ctx context.Context, req *pb.SendEventRequest) (*pb.SendEventResponse, error) {
 	if s.managerURL == "" || s.token == "" {
 		return nil, status.Error(codes.Unavailable, "plugin actions are not configured")
 	}
@@ -58,9 +77,9 @@ func (s *Server) MuteMicrophone(ctx context.Context, req *pb.MuteMicrophoneReque
 		return nil, status.Error(codes.Unauthenticated, "invalid action token")
 	}
 
-	id, err := uuid.Parse(req.GetActivationId())
-	if err != nil || !validID(req.GetCallId()) || !validID(req.GetParticipantId()) {
-		return nil, status.Error(codes.InvalidArgument, "invalid activation, call or participant")
+	id, err := validateEvent(req)
+	if err != nil {
+		return nil, err
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, actionTimeout)
@@ -75,30 +94,60 @@ func (s *Server) MuteMicrophone(ctx context.Context, req *pb.MuteMicrophoneReque
 		return nil, status.Error(codes.FailedPrecondition, "activation does not belong to this call")
 	}
 
-	list, err := s.rooms.ListRooms(ctx, &livekit.ListRoomsRequest{})
+	room, err := s.findRoom(ctx, callID)
 	if err != nil {
-		return nil, livekitError(ctx, err)
+		return nil, err
 	}
 
-	roomName := ""
+	if req.GetEventName() == muteMicrophoneEvent {
+		if err := s.muteMicrophone(ctx, room, req.GetParticipantIds()[0]); err != nil {
+			return nil, err
+		}
+	} else if err := s.sendPluginEvent(ctx, room, id.String(), req); err != nil {
+		return nil, err
+	}
 
-	for _, room := range list.GetRooms() {
-		if room.GetSid() == callID {
-			roomName = room.GetName()
+	return &pb.SendEventResponse{}, nil
+}
 
-			break
+func validateEvent(req *pb.SendEventRequest) (uuid.UUID, error) {
+	id, err := uuid.Parse(req.GetActivationId())
+	if err != nil || !validID(req.GetCallId()) || !validID(req.GetEventName()) || len(req.GetParticipantIds()) == 0 || len(req.GetParticipantIds()) > maxRecipients {
+		return uuid.Nil, status.Error(codes.InvalidArgument, "invalid activation, call, event or recipients")
+	}
+
+	for _, participant := range req.GetParticipantIds() {
+		if !validID(participant) {
+			return uuid.Nil, status.Error(codes.InvalidArgument, "invalid participant")
 		}
 	}
 
-	if roomName == "" {
-		return nil, status.Error(codes.NotFound, "call not found")
+	if req.GetEventName() == muteMicrophoneEvent && (len(req.GetParticipantIds()) != 1 || req.GetData() != "") {
+		return uuid.Nil, status.Error(codes.InvalidArgument, "microphone.mute requires one participant and no data")
 	}
 
-	participant, err := s.rooms.GetParticipant(ctx, &livekit.RoomParticipantIdentity{
-		Room: roomName, Identity: req.GetParticipantId(),
-	})
+	return id, nil
+}
+
+func (s *Server) findRoom(ctx context.Context, callID string) (string, error) {
+	list, err := s.rooms.ListRooms(ctx, &livekit.ListRoomsRequest{})
 	if err != nil {
-		return nil, livekitError(ctx, err)
+		return "", livekitError(ctx, err)
+	}
+
+	for _, room := range list.GetRooms() {
+		if room.GetSid() == callID && room.GetName() != "" {
+			return room.GetName(), nil
+		}
+	}
+
+	return "", status.Error(codes.NotFound, "call not found")
+}
+
+func (s *Server) muteMicrophone(ctx context.Context, room, identity string) error {
+	participant, err := s.rooms.GetParticipant(ctx, &livekit.RoomParticipantIdentity{Room: room, Identity: identity})
+	if err != nil {
+		return livekitError(ctx, err)
 	}
 
 	muted := false
@@ -108,21 +157,49 @@ func (s *Server) MuteMicrophone(ctx context.Context, req *pb.MuteMicrophoneReque
 			continue
 		}
 
-		_, err = s.rooms.MutePublishedTrack(ctx, &livekit.MuteRoomTrackRequest{
-			Room: roomName, Identity: participant.GetIdentity(), TrackSid: track.GetSid(), Muted: true,
-		})
+		_, err = s.rooms.MutePublishedTrack(ctx, &livekit.MuteRoomTrackRequest{Room: room, Identity: participant.GetIdentity(), TrackSid: track.GetSid(), Muted: true})
 		if err != nil {
-			return nil, livekitError(ctx, err)
+			return livekitError(ctx, err)
 		}
 
 		muted = true
 	}
 
 	if !muted {
-		return nil, status.Error(codes.NotFound, "microphone not found")
+		return status.Error(codes.NotFound, "microphone not found")
 	}
 
-	return &pb.MuteMicrophoneResponse{}, nil
+	return nil
+}
+
+func (s *Server) sendPluginEvent(ctx context.Context, room, activationID string, req *pb.SendEventRequest) error {
+	payload, err := json.Marshal(struct {
+		ActivationID string `json:"activationId"`
+		CallID       string `json:"callId"`
+		Name         string `json:"name"`
+		Data         string `json:"data"`
+	}{ActivationID: activationID, CallID: req.GetCallId(), Name: req.GetEventName(), Data: req.GetData()})
+	if err != nil || len(payload) > maxEventBytes {
+		return status.Error(codes.InvalidArgument, "event is too large")
+	}
+
+	for _, identity := range req.GetParticipantIds() {
+		if _, participantErr := s.rooms.GetParticipant(ctx, &livekit.RoomParticipantIdentity{Room: room, Identity: identity}); participantErr != nil {
+			return livekitError(ctx, participantErr)
+		}
+	}
+
+	topic := pluginEventTopic
+
+	_, err = s.rooms.SendData(ctx, &livekit.SendDataRequest{
+		Room: room, Data: payload, Kind: livekit.DataPacket_RELIABLE,
+		DestinationIdentities: req.GetParticipantIds(), Topic: &topic,
+	})
+	if err != nil {
+		return livekitError(ctx, err)
+	}
+
+	return nil
 }
 
 func (s *Server) activationCall(ctx context.Context, id string) (string, error) {
