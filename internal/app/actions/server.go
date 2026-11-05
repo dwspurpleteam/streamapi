@@ -1,6 +1,7 @@
 package actions
 
 import (
+	"bytes"
 	"context"
 	"crypto/subtle"
 	"encoding/json"
@@ -18,17 +19,20 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 
 	pb "github.com/dwspurpleteam/streamapi/internal/pkg/gen/streamapi/v1"
 )
 
 const (
-	actionTimeout       = 10 * time.Second
-	maxManagerResponse  = 64 * 1024
-	maxEventBytes       = 15 * 1024
-	maxRecipients       = 64
-	pluginEventTopic    = "plugin.event.v1"
-	muteMicrophoneEvent = "microphone.mute"
+	actionTimeout          = 10 * time.Second
+	maxManagerResponse     = 64 * 1024
+	maxEventBytes          = 15 * 1024
+	maxRecipients          = 64
+	pluginEventTopic       = "plugin.event.v1"
+	muteMicrophoneEvent    = "microphone.mute"
+	removeParticipantEvent = "participant.remove"
+	updatePermissionsEvent = "participant.permissions.update"
 )
 
 //nolint:interfacebloat // The LiveKit operations needed to deliver events and actions.
@@ -37,6 +41,8 @@ type rooms interface {
 	GetParticipant(ctx context.Context, req *livekit.RoomParticipantIdentity) (*livekit.ParticipantInfo, error)
 	MutePublishedTrack(ctx context.Context, req *livekit.MuteRoomTrackRequest) (*livekit.MuteRoomTrackResponse, error)
 	SendData(ctx context.Context, req *livekit.SendDataRequest) (*livekit.SendDataResponse, error)
+	RemoveParticipant(ctx context.Context, req *livekit.RoomParticipantIdentity) (*livekit.RemoveParticipantResponse, error)
+	UpdateParticipant(ctx context.Context, req *livekit.UpdateParticipantRequest) (*livekit.ParticipantInfo, error)
 }
 
 type Server struct {
@@ -99,12 +105,23 @@ func (s *Server) SendEvent(ctx context.Context, req *pb.SendEventRequest) (*pb.S
 		return nil, err
 	}
 
-	if req.GetEventName() == muteMicrophoneEvent {
+	switch req.GetEventName() {
+	case muteMicrophoneEvent:
 		if err := s.muteMicrophone(ctx, room, req.GetParticipantIds()[0]); err != nil {
 			return nil, err
 		}
-	} else if err := s.sendPluginEvent(ctx, room, id.String(), req); err != nil {
-		return nil, err
+	case removeParticipantEvent:
+		if err := s.removeParticipant(ctx, room, req.GetParticipantIds()[0]); err != nil {
+			return nil, err
+		}
+	case updatePermissionsEvent:
+		if err := s.updatePermissions(ctx, room, req.GetParticipantIds()[0], req.GetData()); err != nil {
+			return nil, err
+		}
+	default:
+		if err := s.sendPluginEvent(ctx, room, id.String(), req); err != nil {
+			return nil, err
+		}
 	}
 
 	return &pb.SendEventResponse{}, nil
@@ -126,7 +143,78 @@ func validateEvent(req *pb.SendEventRequest) (uuid.UUID, error) {
 		return uuid.Nil, status.Error(codes.InvalidArgument, "microphone.mute requires one participant and no data")
 	}
 
+	if req.GetEventName() == removeParticipantEvent && (len(req.GetParticipantIds()) != 1 || req.GetData() != "") {
+		return uuid.Nil, status.Error(codes.InvalidArgument, "participant.remove requires one participant and no data")
+	}
+
+	if req.GetEventName() == updatePermissionsEvent && len(req.GetParticipantIds()) != 1 {
+		return uuid.Nil, status.Error(codes.InvalidArgument, "participant.permissions.update requires one participant")
+	}
+
 	return id, nil
+}
+
+func (s *Server) removeParticipant(ctx context.Context, room, identity string) error {
+	req := &livekit.RoomParticipantIdentity{Room: room, Identity: identity}
+	if _, err := s.rooms.GetParticipant(ctx, req); err != nil {
+		return livekitError(ctx, err)
+	}
+
+	if _, err := s.rooms.RemoveParticipant(ctx, req); err != nil {
+		return livekitError(ctx, err)
+	}
+
+	return nil
+}
+
+func (s *Server) updatePermissions(ctx context.Context, room, identity, data string) error {
+	var patch struct {
+		CanPublish        *bool `json:"canPublish"`
+		CanSubscribe      *bool `json:"canSubscribe"`
+		CanPublishData    *bool `json:"canPublishData"`
+		CanUpdateMetadata *bool `json:"canUpdateMetadata"`
+	}
+
+	decoder := json.NewDecoder(bytes.NewBufferString(data))
+	decoder.DisallowUnknownFields()
+
+	if len(data) > maxEventBytes || decoder.Decode(&patch) != nil || decoder.Decode(&struct{}{}) != io.EOF ||
+		(patch.CanPublish == nil && patch.CanSubscribe == nil && patch.CanPublishData == nil && patch.CanUpdateMetadata == nil) {
+		return status.Error(codes.InvalidArgument, "invalid participant permissions")
+	}
+
+	participant, err := s.rooms.GetParticipant(ctx, &livekit.RoomParticipantIdentity{Room: room, Identity: identity})
+	if err != nil {
+		return livekitError(ctx, err)
+	}
+
+	if participant.GetPermission() == nil {
+		return status.Error(codes.FailedPrecondition, "participant permissions unavailable")
+	}
+
+	permissions := proto.CloneOf(participant.GetPermission())
+	if patch.CanPublish != nil {
+		permissions.CanPublish = *patch.CanPublish
+	}
+
+	if patch.CanSubscribe != nil {
+		permissions.CanSubscribe = *patch.CanSubscribe
+	}
+
+	if patch.CanPublishData != nil {
+		permissions.CanPublishData = *patch.CanPublishData
+	}
+
+	if patch.CanUpdateMetadata != nil {
+		permissions.CanUpdateMetadata = *patch.CanUpdateMetadata
+	}
+
+	_, err = s.rooms.UpdateParticipant(ctx, &livekit.UpdateParticipantRequest{Room: room, Identity: identity, Permission: permissions})
+	if err != nil {
+		return livekitError(ctx, err)
+	}
+
+	return nil
 }
 
 func (s *Server) findRoom(ctx context.Context, callID string) (string, error) {

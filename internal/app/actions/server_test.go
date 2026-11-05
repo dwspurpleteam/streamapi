@@ -25,6 +25,8 @@ type fakeRooms struct {
 	muted   []*livekit.MuteRoomTrackRequest
 	sent    []*livekit.SendDataRequest
 	missing bool
+	removed []*livekit.RoomParticipantIdentity
+	updated []*livekit.UpdateParticipantRequest
 }
 
 const (
@@ -33,6 +35,8 @@ const (
 	testEventName     = "subtitle.updated"
 	testParticipant   = "alice"
 	testAuthorization = "Bearer secret"
+	testActivation    = "11111111-1111-4111-8111-111111111111"
+	testRoom          = "room"
 )
 
 func TestGRPCMuteMicrophone(t *testing.T) {
@@ -70,7 +74,7 @@ func TestGRPCMuteMicrophone(t *testing.T) {
 	ctx := metadata.AppendToOutgoingContext(context.Background(), "authorization", testAuthorization)
 
 	_, err = pb.NewActionServiceClient(conn).MuteMicrophone(ctx, &pb.MuteMicrophoneRequest{
-		ActivationId: "11111111-1111-4111-8111-111111111111", CallId: testCall, ParticipantId: testParticipant,
+		ActivationId: testActivation, CallId: testCall, ParticipantId: testParticipant,
 	})
 	if err != nil || len(room.muted) != 1 {
 		t.Fatalf("mute failed: %v, tracks: %v", err, room.muted)
@@ -78,18 +82,87 @@ func TestGRPCMuteMicrophone(t *testing.T) {
 }
 
 func (f *fakeRooms) ListRooms(context.Context, *livekit.ListRoomsRequest) (*livekit.ListRoomsResponse, error) {
-	return &livekit.ListRoomsResponse{Rooms: []*livekit.Room{{Sid: testCall, Name: "room"}}}, nil
+	return &livekit.ListRoomsResponse{Rooms: []*livekit.Room{{Sid: testCall, Name: testRoom}}}, nil
 }
 
 func (f *fakeRooms) GetParticipant(_ context.Context, req *livekit.RoomParticipantIdentity) (*livekit.ParticipantInfo, error) {
-	if f.missing || req.GetRoom() != "room" || req.GetIdentity() != testParticipant {
+	if f.missing || req.GetRoom() != testRoom || req.GetIdentity() != testParticipant {
 		return nil, twirp.NotFoundError("participant not found")
 	}
 
-	return &livekit.ParticipantInfo{Identity: testParticipant, Tracks: []*livekit.TrackInfo{
-		{Sid: "TR_mic", Source: livekit.TrackSource_MICROPHONE},
-		{Sid: "TR_screen", Source: livekit.TrackSource_SCREEN_SHARE_AUDIO},
-	}}, nil
+	return &livekit.ParticipantInfo{
+		Identity:   testParticipant,
+		Permission: &livekit.ParticipantPermission{CanPublish: true, CanSubscribe: true, CanPublishData: true, Hidden: true},
+		Tracks: []*livekit.TrackInfo{
+			{Sid: "TR_mic", Source: livekit.TrackSource_MICROPHONE},
+			{Sid: "TR_screen", Source: livekit.TrackSource_SCREEN_SHARE_AUDIO},
+		},
+	}, nil
+}
+
+func (f *fakeRooms) RemoveParticipant(_ context.Context, req *livekit.RoomParticipantIdentity) (*livekit.RemoveParticipantResponse, error) {
+	f.removed = append(f.removed, req)
+
+	return &livekit.RemoveParticipantResponse{}, nil
+}
+
+func (f *fakeRooms) UpdateParticipant(_ context.Context, req *livekit.UpdateParticipantRequest) (*livekit.ParticipantInfo, error) {
+	f.updated = append(f.updated, req)
+
+	return &livekit.ParticipantInfo{}, nil
+}
+
+func TestParticipantActions(t *testing.T) {
+	manager := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = fmt.Fprint(w, `{"callId":"RM_call","state":"ACTIVE"}`)
+	}))
+	defer manager.Close()
+
+	room := &fakeRooms{}
+	server := New(manager.URL, "secret", manager.Client(), room)
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", testAuthorization))
+
+	req := &pb.SendEventRequest{
+		CallId: testCall, ActivationId: testActivation,
+		ParticipantIds: []string{testParticipant}, EventName: updatePermissionsEvent, Data: `{"canPublish":false}`,
+	}
+	if _, err := server.SendEvent(ctx, req); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(room.updated) != 1 || room.updated[0].GetPermission().GetCanPublish() ||
+		!room.updated[0].GetPermission().GetCanSubscribe() || !room.updated[0].GetPermission().GetCanPublishData() ||
+		!room.updated[0].GetPermission().GetHidden() {
+		t.Fatalf("permissions not preserved: %v", room.updated)
+	}
+
+	for _, data := range []string{`{}`, `{"canPublish":"false"}`, `{"other":true}`, `{"canPublish":false} {}`} {
+		req.Data = data
+		if _, err := server.SendEvent(ctx, req); status.Code(err) != codes.InvalidArgument {
+			t.Fatalf("invalid permissions %q: %v", data, err)
+		}
+	}
+
+	req.Data = ""
+	req.EventName = removeParticipantEvent
+
+	req.ParticipantIds = []string{"outside"}
+	if _, err := server.SendEvent(ctx, req); status.Code(err) != codes.NotFound {
+		t.Fatalf("outside participant: %v", err)
+	}
+
+	if len(room.removed) != 0 {
+		t.Fatal("removed participant outside call")
+	}
+
+	req.ParticipantIds = []string{testParticipant}
+	if _, err := server.SendEvent(ctx, req); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(room.removed) != 1 || room.removed[0].GetRoom() != testRoom || room.removed[0].GetIdentity() != testParticipant {
+		t.Fatalf("unexpected removal: %v", room.removed)
+	}
 }
 
 func (f *fakeRooms) MutePublishedTrack(_ context.Context, req *livekit.MuteRoomTrackRequest) (*livekit.MuteRoomTrackResponse, error) {
@@ -115,7 +188,7 @@ func TestSendEvent(t *testing.T) {
 	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", testAuthorization))
 
 	request := &pb.SendEventRequest{
-		CallId: testCall, ActivationId: "11111111-1111-4111-8111-111111111111",
+		CallId: testCall, ActivationId: testActivation,
 		EventName: testEventName, ParticipantIds: []string{testParticipant}, Data: "hello",
 	}
 	if _, err := server.SendEvent(ctx, request); err != nil {
@@ -171,7 +244,7 @@ func TestSendEvent(t *testing.T) {
 }
 
 func TestMuteMicrophone(t *testing.T) {
-	const activation = "11111111-1111-4111-8111-111111111111"
+	const activation = testActivation
 
 	cases := []struct {
 		name    string
