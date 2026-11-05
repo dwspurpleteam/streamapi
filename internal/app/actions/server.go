@@ -1,7 +1,6 @@
 package actions
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -66,21 +65,17 @@ func (s *Server) SendEvent(ctx context.Context, req *pb.SendEventRequest) (*pb.S
 
 	switch req.GetEventName() {
 	case muteMicrophoneEvent:
-		if err := s.muteMicrophone(ctx, room, req.GetParticipantIds()[0]); err != nil {
-			return nil, err
-		}
+		err = s.muteMicrophone(ctx, room, req.GetParticipantIds()[0])
 	case removeParticipantEvent:
-		if err := s.removeParticipant(ctx, room, req.GetParticipantIds()[0]); err != nil {
-			return nil, err
-		}
+		err = s.removeParticipant(ctx, room, req.GetParticipantIds()[0])
 	case updatePermissionsEvent:
-		if err := s.updatePermissions(ctx, room, req.GetParticipantIds()[0], req.GetData()); err != nil {
-			return nil, err
-		}
+		err = s.updatePermissions(ctx, room, req.GetParticipantIds()[0], req.GetData())
 	default:
-		if err := s.sendPluginEvent(ctx, room, id.String(), req); err != nil {
-			return nil, err
-		}
+		err = s.sendPluginEvent(ctx, room, id.String(), req)
+	}
+
+	if err != nil {
+		return nil, err
 	}
 
 	return &pb.SendEventResponse{}, nil
@@ -98,12 +93,9 @@ func validateEvent(req *pb.SendEventRequest) (uuid.UUID, error) {
 		}
 	}
 
-	if req.GetEventName() == muteMicrophoneEvent && (len(req.GetParticipantIds()) != 1 || req.GetData() != "") {
-		return uuid.Nil, status.Error(codes.InvalidArgument, "microphone.mute requires one participant and no data")
-	}
-
-	if req.GetEventName() == removeParticipantEvent && (len(req.GetParticipantIds()) != 1 || req.GetData() != "") {
-		return uuid.Nil, status.Error(codes.InvalidArgument, "participant.remove requires one participant and no data")
+	if (req.GetEventName() == muteMicrophoneEvent || req.GetEventName() == removeParticipantEvent) &&
+		(len(req.GetParticipantIds()) != 1 || req.GetData() != "") {
+		return uuid.Nil, status.Error(codes.InvalidArgument, req.GetEventName()+" requires one participant and no data")
 	}
 
 	if req.GetEventName() == updatePermissionsEvent && len(req.GetParticipantIds()) != 1 {
@@ -134,7 +126,7 @@ func (s *Server) updatePermissions(ctx context.Context, room, identity, data str
 		CanUpdateMetadata *bool `json:"canUpdateMetadata"`
 	}
 
-	decoder := json.NewDecoder(bytes.NewBufferString(data))
+	decoder := json.NewDecoder(strings.NewReader(data))
 	decoder.DisallowUnknownFields()
 
 	if len(data) > maxEventBytes || decoder.Decode(&patch) != nil || decoder.Decode(&struct{}{}) != io.EOF ||
