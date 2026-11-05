@@ -89,8 +89,6 @@ func newApp(c *config, logger *slog.Logger) (*app, error) {
 	}
 
 	callActions := actions.New(
-		c.Actions.ManagerURL,
-		http.DefaultClient,
 		lksdk.NewRoomServiceClient(c.LiveKit.URL, c.LiveKit.APIKey, c.LiveKit.APISecret),
 	)
 	app.grpc = newGRPCServer(c.GRPC, app.streams, app.eventStreams, callActions)

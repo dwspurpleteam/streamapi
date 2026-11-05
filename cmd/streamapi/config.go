@@ -14,14 +14,9 @@ type config struct {
 	HTTP            httpConfig    `yaml:"http"`
 	Media           mediaConfig   `yaml:"media"`
 	Events          eventsConfig  `yaml:"events"`
-	Actions         actionsConfig `yaml:"actions"`
 	LiveKit         livekitConfig `yaml:"livekit"`
 	NATS            natsConfig    `yaml:"nats"`
 	ShutdownTimeout time.Duration `yaml:"shutdown_timeout"`
-}
-
-type actionsConfig struct {
-	ManagerURL string `yaml:"manager_url"`
 }
 
 type grpcConfig struct {

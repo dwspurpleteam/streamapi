@@ -3,10 +3,7 @@ package actions
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/livekit/protocol/livekit"
@@ -30,7 +27,6 @@ type fakeRooms struct {
 
 const (
 	testCall        = "RM_call"
-	testActive      = "ACTIVE"
 	testEventName   = "subtitle.updated"
 	testParticipant = "alice"
 	testActivation  = "11111111-1111-4111-8111-111111111111"
@@ -38,16 +34,11 @@ const (
 )
 
 func TestGRPCMuteMicrophone(t *testing.T) {
-	manager := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = fmt.Fprint(w, `{"callId":"RM_call","state":"ACTIVE"}`)
-	}))
-	defer manager.Close()
-
 	room := &fakeRooms{}
 	listener := bufconn.Listen(1024 * 1024)
 	rpc := grpc.NewServer()
 
-	pb.RegisterActionServiceServer(rpc, New(manager.URL, manager.Client(), room))
+	pb.RegisterActionServiceServer(rpc, New(room))
 	go func() {
 		if err := rpc.Serve(listener); err != nil {
 			t.Errorf("grpc server: %v", err)
@@ -111,13 +102,8 @@ func (f *fakeRooms) UpdateParticipant(_ context.Context, req *livekit.UpdatePart
 }
 
 func TestParticipantActions(t *testing.T) {
-	manager := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = fmt.Fprint(w, `{"callId":"RM_call","state":"ACTIVE"}`)
-	}))
-	defer manager.Close()
-
 	room := &fakeRooms{}
-	server := New(manager.URL, manager.Client(), room)
+	server := New(room)
 	ctx := context.Background()
 
 	req := &pb.SendEventRequest{
@@ -176,13 +162,8 @@ func (f *fakeRooms) SendData(_ context.Context, req *livekit.SendDataRequest) (*
 }
 
 func TestSendEvent(t *testing.T) {
-	manager := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = fmt.Fprint(w, `{"callId":"RM_call","state":"ACTIVE"}`)
-	}))
-	defer manager.Close()
-
 	room := &fakeRooms{}
-	server := New(manager.URL, manager.Client(), room)
+	server := New(room)
 	ctx := context.Background()
 
 	request := &pb.SendEventRequest{
@@ -242,36 +223,23 @@ func TestSendEvent(t *testing.T) {
 }
 
 func TestMuteMicrophone(t *testing.T) {
-	const activation = testActivation
-
 	cases := []struct {
-		name    string
-		call    string
-		state   string
-		missing bool
-		want    codes.Code
+		name, call string
+		missing    bool
+		want       codes.Code
 	}{
-		{name: "active", call: testCall, state: testActive, want: codes.OK},
-		{name: "inactive", call: testCall, state: "STOPPED", want: codes.FailedPrecondition},
-		{name: "wrong call", call: "RM_other", state: testActive, want: codes.FailedPrecondition},
-		{name: "participant outside call", call: testCall, state: testActive, missing: true, want: codes.NotFound},
+		{name: "participant in call", call: testCall, want: codes.OK},
+		{name: "unknown call", call: "RM_other", want: codes.NotFound},
+		{name: "participant outside call", call: testCall, missing: true, want: codes.NotFound},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			manager := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if r.URL.Path != "/v1/activations/"+activation {
-					t.Errorf("unexpected path %s", r.URL.Path)
-				}
-
-				_, _ = fmt.Fprintf(w, `{"callId":"RM_call","state":%q}`, tc.state)
-			}))
-			defer manager.Close()
-
 			room := &fakeRooms{missing: tc.missing}
-			server := New(manager.URL, manager.Client(), room)
-			ctx := context.Background()
+			server := New(room)
 
-			_, err := server.SendEvent(ctx, &pb.SendEventRequest{ActivationId: activation, CallId: tc.call, ParticipantIds: []string{testParticipant}, EventName: muteMicrophoneEvent})
+			_, err := server.SendEvent(context.Background(), &pb.SendEventRequest{
+				ActivationId: testActivation, CallId: tc.call, ParticipantIds: []string{testParticipant}, EventName: muteMicrophoneEvent,
+			})
 			if got := status.Code(err); got != tc.want {
 				t.Fatalf("code = %v, want %v: %v", got, tc.want, err)
 			}

@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"net/http"
-	"net/url"
 	"strings"
 	"time"
 	"unicode"
@@ -24,7 +22,6 @@ import (
 
 const (
 	actionTimeout          = 10 * time.Second
-	maxManagerResponse     = 64 * 1024
 	maxEventBytes          = 15 * 1024
 	maxRecipients          = 64
 	pluginEventTopic       = "plugin.event.v1"
@@ -46,20 +43,14 @@ type rooms interface {
 type Server struct {
 	pb.UnimplementedActionServiceServer
 
-	managerURL string
-	client     *http.Client
-	rooms      rooms
+	rooms rooms
 }
 
-func New(managerURL string, client *http.Client, rooms rooms) *Server {
-	return &Server{managerURL: strings.TrimRight(managerURL, "/"), client: client, rooms: rooms}
+func New(rooms rooms) *Server {
+	return &Server{rooms: rooms}
 }
 
 func (s *Server) SendEvent(ctx context.Context, req *pb.SendEventRequest) (*pb.SendEventResponse, error) {
-	if s.managerURL == "" {
-		return nil, status.Error(codes.Unavailable, "plugin actions are not configured")
-	}
-
 	id, err := validateEvent(req)
 	if err != nil {
 		return nil, err
@@ -68,16 +59,7 @@ func (s *Server) SendEvent(ctx context.Context, req *pb.SendEventRequest) (*pb.S
 	ctx, cancel := context.WithTimeout(ctx, actionTimeout)
 	defer cancel()
 
-	callID, err := s.activationCall(ctx, id.String())
-	if err != nil {
-		return nil, err
-	}
-
-	if callID != req.GetCallId() {
-		return nil, status.Error(codes.FailedPrecondition, "activation does not belong to this call")
-	}
-
-	room, err := s.findRoom(ctx, callID)
+	room, err := s.findRoom(ctx, req.GetCallId())
 	if err != nil {
 		return nil, err
 	}
@@ -265,49 +247,6 @@ func (s *Server) sendPluginEvent(ctx context.Context, room, activationID string,
 	}
 
 	return nil
-}
-
-func (s *Server) activationCall(ctx context.Context, id string) (string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, s.managerURL+"/v1/activations/"+url.PathEscape(id), nil)
-	if err != nil {
-		return "", status.Error(codes.Unavailable, "plugin manager is not configured")
-	}
-
-	response, err := s.client.Do(req)
-	if err != nil {
-		if ctx.Err() != nil {
-			return "", status.FromContextError(ctx.Err()).Err()
-		}
-
-		return "", status.Error(codes.Unavailable, "plugin manager is unavailable")
-	}
-	defer response.Body.Close()
-
-	if response.StatusCode == http.StatusNotFound {
-		return "", status.Error(codes.NotFound, "activation not found")
-	}
-
-	if response.StatusCode != http.StatusOK {
-		return "", status.Error(codes.Unavailable, "plugin manager is unavailable")
-	}
-
-	var activation struct {
-		CallID string `json:"callId"`
-		State  string `json:"state"`
-	}
-	if err := json.NewDecoder(io.LimitReader(response.Body, maxManagerResponse)).Decode(&activation); err != nil {
-		return "", status.Error(codes.Unavailable, "invalid plugin manager response")
-	}
-
-	if activation.State != "ACTIVE" {
-		return "", status.Error(codes.FailedPrecondition, "activation is not active")
-	}
-
-	if !validID(activation.CallID) {
-		return "", status.Error(codes.Unavailable, "invalid plugin manager response")
-	}
-
-	return activation.CallID, nil
 }
 
 func validID(id string) bool {
