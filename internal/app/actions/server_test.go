@@ -14,7 +14,6 @@ import (
 	grpc "google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/bufconn"
 
@@ -30,13 +29,12 @@ type fakeRooms struct {
 }
 
 const (
-	testCall          = "RM_call"
-	testActive        = "ACTIVE"
-	testEventName     = "subtitle.updated"
-	testParticipant   = "alice"
-	testAuthorization = "Bearer secret"
-	testActivation    = "11111111-1111-4111-8111-111111111111"
-	testRoom          = "room"
+	testCall        = "RM_call"
+	testActive      = "ACTIVE"
+	testEventName   = "subtitle.updated"
+	testParticipant = "alice"
+	testActivation  = "11111111-1111-4111-8111-111111111111"
+	testRoom        = "room"
 )
 
 func TestGRPCMuteMicrophone(t *testing.T) {
@@ -49,7 +47,7 @@ func TestGRPCMuteMicrophone(t *testing.T) {
 	listener := bufconn.Listen(1024 * 1024)
 	rpc := grpc.NewServer()
 
-	pb.RegisterActionServiceServer(rpc, New(manager.URL, "secret", manager.Client(), room))
+	pb.RegisterActionServiceServer(rpc, New(manager.URL, manager.Client(), room))
 	go func() {
 		if err := rpc.Serve(listener); err != nil {
 			t.Errorf("grpc server: %v", err)
@@ -71,7 +69,7 @@ func TestGRPCMuteMicrophone(t *testing.T) {
 		}
 	}()
 
-	ctx := metadata.AppendToOutgoingContext(context.Background(), "authorization", testAuthorization)
+	ctx := context.Background()
 
 	_, err = pb.NewActionServiceClient(conn).SendEvent(ctx, &pb.SendEventRequest{
 		ActivationId: testActivation, CallId: testCall, ParticipantIds: []string{testParticipant}, EventName: muteMicrophoneEvent,
@@ -119,8 +117,8 @@ func TestParticipantActions(t *testing.T) {
 	defer manager.Close()
 
 	room := &fakeRooms{}
-	server := New(manager.URL, "secret", manager.Client(), room)
-	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", testAuthorization))
+	server := New(manager.URL, manager.Client(), room)
+	ctx := context.Background()
 
 	req := &pb.SendEventRequest{
 		CallId: testCall, ActivationId: testActivation,
@@ -184,8 +182,8 @@ func TestSendEvent(t *testing.T) {
 	defer manager.Close()
 
 	room := &fakeRooms{}
-	server := New(manager.URL, "secret", manager.Client(), room)
-	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", testAuthorization))
+	server := New(manager.URL, manager.Client(), room)
+	ctx := context.Background()
 
 	request := &pb.SendEventRequest{
 		CallId: testCall, ActivationId: testActivation,
@@ -248,17 +246,15 @@ func TestMuteMicrophone(t *testing.T) {
 
 	cases := []struct {
 		name    string
-		token   string
 		call    string
 		state   string
 		missing bool
 		want    codes.Code
 	}{
-		{name: "active", token: testAuthorization, call: testCall, state: testActive, want: codes.OK},
-		{name: "wrong token", token: "Bearer wrong", call: testCall, state: testActive, want: codes.Unauthenticated},
-		{name: "inactive", token: testAuthorization, call: testCall, state: "STOPPED", want: codes.FailedPrecondition},
-		{name: "wrong call", token: testAuthorization, call: "RM_other", state: testActive, want: codes.FailedPrecondition},
-		{name: "participant outside call", token: testAuthorization, call: testCall, state: testActive, missing: true, want: codes.NotFound},
+		{name: "active", call: testCall, state: testActive, want: codes.OK},
+		{name: "inactive", call: testCall, state: "STOPPED", want: codes.FailedPrecondition},
+		{name: "wrong call", call: "RM_other", state: testActive, want: codes.FailedPrecondition},
+		{name: "participant outside call", call: testCall, state: testActive, missing: true, want: codes.NotFound},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -272,8 +268,8 @@ func TestMuteMicrophone(t *testing.T) {
 			defer manager.Close()
 
 			room := &fakeRooms{missing: tc.missing}
-			server := New(manager.URL, "secret", manager.Client(), room)
-			ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", tc.token))
+			server := New(manager.URL, manager.Client(), room)
+			ctx := context.Background()
 
 			_, err := server.SendEvent(ctx, &pb.SendEventRequest{ActivationId: activation, CallId: tc.call, ParticipantIds: []string{testParticipant}, EventName: muteMicrophoneEvent})
 			if got := status.Code(err); got != tc.want {

@@ -22,7 +22,6 @@ type config struct {
 
 type actionsConfig struct {
 	ManagerURL string `yaml:"manager_url"`
-	Token      string `yaml:"token"`
 }
 
 type grpcConfig struct {

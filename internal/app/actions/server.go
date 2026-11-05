@@ -3,7 +3,6 @@ package actions
 import (
 	"bytes"
 	"context"
-	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"io"
@@ -17,7 +16,6 @@ import (
 	"github.com/livekit/protocol/livekit"
 	"github.com/twitchtv/twirp"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 
@@ -49,25 +47,17 @@ type Server struct {
 	pb.UnimplementedActionServiceServer
 
 	managerURL string
-	token      string
 	client     *http.Client
 	rooms      rooms
 }
 
-func New(managerURL, token string, client *http.Client, rooms rooms) *Server {
-	return &Server{managerURL: strings.TrimRight(managerURL, "/"), token: token, client: client, rooms: rooms}
+func New(managerURL string, client *http.Client, rooms rooms) *Server {
+	return &Server{managerURL: strings.TrimRight(managerURL, "/"), client: client, rooms: rooms}
 }
 
 func (s *Server) SendEvent(ctx context.Context, req *pb.SendEventRequest) (*pb.SendEventResponse, error) {
-	if s.managerURL == "" || s.token == "" {
+	if s.managerURL == "" {
 		return nil, status.Error(codes.Unavailable, "plugin actions are not configured")
-	}
-
-	md, _ := metadata.FromIncomingContext(ctx)
-
-	auth := md.Get("authorization")
-	if len(auth) != 1 || subtle.ConstantTimeCompare([]byte(auth[0]), []byte("Bearer "+s.token)) != 1 {
-		return nil, status.Error(codes.Unauthenticated, "invalid action token")
 	}
 
 	id, err := validateEvent(req)

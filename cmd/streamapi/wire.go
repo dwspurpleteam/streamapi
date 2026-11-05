@@ -90,7 +90,6 @@ func newApp(c *config, logger *slog.Logger) (*app, error) {
 
 	callActions := actions.New(
 		c.Actions.ManagerURL,
-		c.Actions.Token,
 		http.DefaultClient,
 		lksdk.NewRoomServiceClient(c.LiveKit.URL, c.LiveKit.APIKey, c.LiveKit.APISecret),
 	)
