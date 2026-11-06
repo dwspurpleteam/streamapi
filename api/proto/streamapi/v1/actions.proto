@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package streamapi.v1;
+
+option go_package = "github.com/dwspurpleteam/streamapi/internal/pkg/gen/streamapi/v1;streamapiv1";
+
+service ActionService {
+  rpc SendEvent(SendEventRequest) returns (SendEventResponse);
+}
+
+message SendEventRequest {
+  string call_id = 1;
+  string activation_id = 2;
+  string event_name = 3;
+  repeated string participant_ids = 4;
+  string data = 5;
+}
+
+message SendEventResponse {}
