@@ -1,4 +1,4 @@
-name: image
+name: delivery
 
 on:
   push:
@@ -11,3 +11,6 @@ permissions:
 jobs:
   image:
     uses: dwspurpleteam/.github/.github/workflows/image.yml@main
+    with:
+      service: streamapi
+    secrets: inherit
