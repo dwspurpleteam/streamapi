@@ -9,14 +9,20 @@ import (
 )
 
 type config struct {
-	Name            string        `yaml:"name"`
-	GRPC            grpcConfig    `yaml:"grpc"`
-	HTTP            httpConfig    `yaml:"http"`
-	Media           mediaConfig   `yaml:"media"`
-	Events          eventsConfig  `yaml:"events"`
-	LiveKit         livekitConfig `yaml:"livekit"`
-	NATS            natsConfig    `yaml:"nats"`
-	ShutdownTimeout time.Duration `yaml:"shutdown_timeout"`
+	Name            string              `yaml:"name"`
+	GRPC            grpcConfig          `yaml:"grpc"`
+	HTTP            httpConfig          `yaml:"http"`
+	Media           mediaConfig         `yaml:"media"`
+	Events          eventsConfig        `yaml:"events"`
+	LiveKit         livekitConfig       `yaml:"livekit"`
+	NATS            natsConfig          `yaml:"nats"`
+	PluginManager   pluginManagerConfig `yaml:"plugin_manager"`
+	ShutdownTimeout time.Duration       `yaml:"shutdown_timeout"`
+}
+
+type pluginManagerConfig struct {
+	Address string        `yaml:"address"`
+	Timeout time.Duration `yaml:"timeout"`
 }
 
 type grpcConfig struct {

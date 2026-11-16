@@ -28,6 +28,8 @@ type Server struct {
 	pb.UnimplementedEventServiceServer
 
 	dispatcher   *events.Dispatcher
+	permissions  EventPermissions
+	available    []string
 	timeout      time.Duration
 	logger       *slog.Logger
 	wg           sync.WaitGroup
@@ -35,6 +37,10 @@ type Server struct {
 	slow         atomic.Uint64
 	queueAge     *metrics.Histogram
 	sendDuration *metrics.Histogram
+}
+
+type EventPermissions interface {
+	Events(ctx context.Context, call, activation string, requested, available []string) ([]string, error)
 }
 
 type Snapshot struct {
@@ -52,13 +58,17 @@ func New(
 	timeout time.Duration,
 	buckets []float64,
 	logger *slog.Logger,
+	permissions EventPermissions,
+	available []string,
 ) *Server {
 	buckets = slices.Clone(buckets)
 
 	return &Server{
-		dispatcher: dispatcher,
-		timeout:    timeout,
-		logger:     logger,
+		dispatcher:  dispatcher,
+		permissions: permissions,
+		available:   slices.Clone(available),
+		timeout:     timeout,
+		logger:      logger,
 
 		queueAge: metrics.NewHistogram(prometheus.HistogramOpts{
 			Name:    "streamapi_events_queue_age_seconds",
@@ -77,10 +87,15 @@ func (s *Server) Subscribe(
 	request *pb.SubscribeEventsRequest,
 	stream rpc.ServerStreamingServer[pb.SubscribeEventsResponse],
 ) error {
+	types, err := s.permissions.Events(stream.Context(), request.GetCallId(), request.GetActivationId(), request.GetEventTypes(), s.available)
+	if err != nil {
+		return fmt.Errorf("check event permission: %w", err)
+	}
+
 	sub, err := s.dispatcher.Subscribe(stream.Context(), events.Selection{
 		CallID:      request.GetCallId(),
 		Participant: request.GetParticipantId(),
-		Types:       request.GetEventTypes(),
+		Types:       types,
 	})
 	if err != nil {
 		return eventError(err)

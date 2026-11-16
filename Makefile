@@ -56,7 +56,7 @@ generate/go:
 .PHONY: generate/proto
 generate/proto: $(BIN_PATH)/protoc-gen-go $(BIN_PATH)/protoc-gen-go-grpc
 	@mkdir -p internal/pkg/gen
-	@PATH="$(abspath $(BIN_PATH)):$$PATH" protoc -I api/proto --go_out=internal/pkg/gen --go_opt=paths=source_relative --go-grpc_out=internal/pkg/gen --go-grpc_opt=paths=source_relative api/proto/streamapi/v1/*.proto
+	@PATH="$(abspath $(BIN_PATH)):$$PATH" protoc -I api/proto --go_out=internal/pkg/gen --go_opt=paths=source_relative --go-grpc_out=internal/pkg/gen --go-grpc_opt=paths=source_relative api/proto/streamapi/v1/*.proto api/proto/routes/v1/*.proto
 
 $(BIN_PATH)/golangci-lint: | $(BIN_PATH)
 	@curl -fsSL "https://raw.githubusercontent.com/golangci/golangci-lint/$(GOLANGCI_LINT_VERSION)/install.sh" -o "$(BIN_PATH)/.golangci-lint-install.sh"

@@ -24,6 +24,7 @@ func run(logger *slog.Logger) error {
 		return fmt.Errorf("create streamapi: %w", err)
 	}
 	defer app.publisher.Close()
+	defer app.pluginManager.Close()
 
 	if err := app.serve(ctx, cfg, logger); err != nil && !errors.Is(err, context.Canceled) {
 		return fmt.Errorf("run streamapi: %w", err)

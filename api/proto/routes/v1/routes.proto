@@ -1,0 +1,91 @@
+syntax = "proto3";
+
+package routes.v1;
+
+option go_package = "github.com/dwspurpleteam/streamapi/internal/pkg/gen/routes/v1;routesv1";
+
+option java_multiple_files = true;
+option java_package = "ru.itmo.pluginmanager.routes.v1";
+
+enum EventType {
+  EVENT_TYPE_UNSPECIFIED = 0;
+
+  EVENT_TYPE_PARTICIPANT_JOINED = 1;
+  EVENT_TYPE_PARTICIPANT_LEFT = 2;
+  EVENT_TYPE_PARTICIPANT_CONNECTION_ABORTED = 3;
+  EVENT_TYPE_PARTICIPANT_RECONNECTING = 4;
+  EVENT_TYPE_PARTICIPANT_RECONNECTED = 5;
+  EVENT_TYPE_PARTICIPANT_KICKED = 6;
+
+  EVENT_TYPE_MEDIA_AUDIO_MUTED = 7;
+  EVENT_TYPE_MEDIA_AUDIO_UNMUTED = 8;
+  EVENT_TYPE_MEDIA_VIDEO_ENABLED = 9;
+  EVENT_TYPE_MEDIA_VIDEO_DISABLED = 10;
+  EVENT_TYPE_MEDIA_SCREEN_SHARE_STARTED = 11;
+  EVENT_TYPE_MEDIA_SCREEN_SHARE_STOPPED = 12;
+  EVENT_TYPE_MEDIA_TRACK_PUBLISHED = 13;
+  EVENT_TYPE_MEDIA_TRACK_UNPUBLISHED = 14;
+
+  EVENT_TYPE_INTERACTION_CHAT_MESSAGE_RECEIVED = 15;
+  EVENT_TYPE_CALL_STARTED = 16;
+  EVENT_TYPE_CALL_ENDED = 17;
+}
+
+enum MediaType {
+  MEDIA_TYPE_UNSPECIFIED = 0;
+  MEDIA_TYPE_AUDIO = 1;
+  MEDIA_TYPE_VIDEO = 2;
+  MEDIA_TYPE_SCREEN_SHARE = 3;
+  MEDIA_TYPE_SCREEN_SHARE_AUDIO = 4;
+}
+
+message CheckEventPermissionRequest {
+  string call_id = 1;
+  EventType event_type = 2;
+  string from_user = 3;
+  string activation_id = 4;
+  string activation_secret = 5;
+}
+
+message CheckEventPermissionResponse {
+  EventType event_type = 1;
+  bool can_send = 2;
+  repeated string plugin_ids = 3;
+}
+
+message CheckMediaPermissionRequest {
+  string call_id = 1;
+  MediaType media_type = 2;
+  string from_user = 3;
+  string activation_id = 4;
+  string activation_secret = 5;
+}
+
+message CheckMediaPermissionResponse {
+  bool can_send = 1;
+  MediaType media_type = 2;
+  repeated PluginInfo plugins = 3;
+}
+
+message PluginInfo {
+  string plugin_id = 1;
+  string plugin_version = 2;
+}
+
+message CheckActionPermissionRequest {
+  string call_id = 1;
+  string activation_id = 2;
+  string action = 3;
+  string activation_secret = 4;
+}
+
+message CheckActionPermissionResponse {
+  bool allowed = 1;
+}
+
+service RoutesService {
+  rpc CheckEventPermission(CheckEventPermissionRequest) returns (CheckEventPermissionResponse);
+
+  rpc CheckMediaPermission(CheckMediaPermissionRequest) returns (CheckMediaPermissionResponse);
+  rpc CheckActionPermission(CheckActionPermissionRequest) returns (CheckActionPermissionResponse);
+}
