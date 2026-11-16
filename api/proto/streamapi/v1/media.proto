@@ -20,6 +20,7 @@ message SubscribeRequest {
   string participant_id = 3;
   string track_id = 4;
   repeated MediaKind kinds = 5;
+  string activation_id = 6;
 }
 
 message SubscribeResponse {
