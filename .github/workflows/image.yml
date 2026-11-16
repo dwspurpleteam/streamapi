@@ -2,7 +2,7 @@ name: image
 
 on:
   push:
-    branches: [main]
+    branches: [main, ci/images]
 
 permissions:
   contents: read
@@ -10,4 +10,4 @@ permissions:
 
 jobs:
   image:
-    uses: dwspurpleteam/.github/.github/workflows/image.yml@main
+    uses: dwspurpleteam/.github/.github/workflows/image.yml@ci/images
