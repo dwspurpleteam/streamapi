@@ -1,0 +1,13 @@
+name: image
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  image:
+    uses: dwspurpleteam/.github/.github/workflows/image.yml@main
