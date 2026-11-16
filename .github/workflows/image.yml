@@ -1,4 +1,4 @@
-name: image
+name: delivery
 
 on:
   push:
