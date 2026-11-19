@@ -17,6 +17,10 @@ import (
 	pb "github.com/dwspurpleteam/streamapi/internal/pkg/gen/streamapi/v1"
 )
 
+type allowActions struct{}
+
+func (allowActions) Action(context.Context, string, string, string) error { return nil }
+
 type fakeRooms struct {
 	muted   []*livekit.MuteRoomTrackRequest
 	sent    []*livekit.SendDataRequest
@@ -38,7 +42,7 @@ func TestGRPCMuteMicrophone(t *testing.T) {
 	listener := bufconn.Listen(1024 * 1024)
 	rpc := grpc.NewServer()
 
-	pb.RegisterActionServiceServer(rpc, New(room))
+	pb.RegisterActionServiceServer(rpc, New(room, allowActions{}))
 	go func() {
 		if err := rpc.Serve(listener); err != nil {
 			t.Errorf("grpc server: %v", err)
@@ -103,7 +107,7 @@ func (f *fakeRooms) UpdateParticipant(_ context.Context, req *livekit.UpdatePart
 
 func TestParticipantActions(t *testing.T) {
 	room := &fakeRooms{}
-	server := New(room)
+	server := New(room, allowActions{})
 	ctx := context.Background()
 
 	req := &pb.SendEventRequest{
@@ -163,7 +167,7 @@ func (f *fakeRooms) SendData(_ context.Context, req *livekit.SendDataRequest) (*
 
 func TestSendEvent(t *testing.T) {
 	room := &fakeRooms{}
-	server := New(room)
+	server := New(room, allowActions{})
 	ctx := context.Background()
 
 	request := &pb.SendEventRequest{
@@ -235,7 +239,7 @@ func TestMuteMicrophone(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			room := &fakeRooms{missing: tc.missing}
-			server := New(room)
+			server := New(room, allowActions{})
 
 			_, err := server.SendEvent(context.Background(), &pb.SendEventRequest{
 				ActivationId: testActivation, CallId: tc.call, ParticipantIds: []string{testParticipant}, EventName: muteMicrophoneEvent,

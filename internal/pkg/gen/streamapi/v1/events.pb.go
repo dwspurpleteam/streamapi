@@ -27,6 +27,7 @@ type SubscribeEventsRequest struct {
 	CallId        string                 `protobuf:"bytes,1,opt,name=call_id,json=callId,proto3" json:"call_id,omitempty"`
 	ParticipantId string                 `protobuf:"bytes,2,opt,name=participant_id,json=participantId,proto3" json:"participant_id,omitempty"`
 	EventTypes    []string               `protobuf:"bytes,3,rep,name=event_types,json=eventTypes,proto3" json:"event_types,omitempty"`
+	ActivationId  string                 `protobuf:"bytes,4,opt,name=activation_id,json=activationId,proto3" json:"activation_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -80,6 +81,13 @@ func (x *SubscribeEventsRequest) GetEventTypes() []string {
 		return x.EventTypes
 	}
 	return nil
+}
+
+func (x *SubscribeEventsRequest) GetActivationId() string {
+	if x != nil {
+		return x.ActivationId
+	}
+	return ""
 }
 
 type SubscribeEventsResponse struct {
@@ -186,12 +194,13 @@ var File_streamapi_v1_events_proto protoreflect.FileDescriptor
 
 const file_streamapi_v1_events_proto_rawDesc = "" +
 	"\n" +
-	"\x19streamapi/v1/events.proto\x12\fstreamapi.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"y\n" +
+	"\x19streamapi/v1/events.proto\x12\fstreamapi.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\x9e\x01\n" +
 	"\x16SubscribeEventsRequest\x12\x17\n" +
 	"\acall_id\x18\x01 \x01(\tR\x06callId\x12%\n" +
 	"\x0eparticipant_id\x18\x02 \x01(\tR\rparticipantId\x12\x1f\n" +
 	"\vevent_types\x18\x03 \x03(\tR\n" +
-	"eventTypes\"\x95\x02\n" +
+	"eventTypes\x12#\n" +
+	"\ractivation_id\x18\x04 \x01(\tR\factivationId\"\x95\x02\n" +
 	"\x17SubscribeEventsResponse\x12\x19\n" +
 	"\bevent_id\x18\x01 \x01(\tR\aeventId\x12\x12\n" +
 	"\x04type\x18\x02 \x01(\tR\x04type\x12\x16\n" +

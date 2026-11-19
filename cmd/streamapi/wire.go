@@ -1,12 +1,14 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 
 	lksdk "github.com/livekit/server-sdk-go/v2"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
 
 	"github.com/dwspurpleteam/streamapi/internal/app/actions"
@@ -18,27 +20,50 @@ import (
 	livekitadapter "github.com/dwspurpleteam/streamapi/internal/app/media/adapters/livekit"
 	mediagrpc "github.com/dwspurpleteam/streamapi/internal/app/media/ports/grpc"
 	media "github.com/dwspurpleteam/streamapi/internal/app/media/service"
+	"github.com/dwspurpleteam/streamapi/internal/app/permissions"
+	routes "github.com/dwspurpleteam/streamapi/internal/pkg/gen/routes/v1"
 	pb "github.com/dwspurpleteam/streamapi/internal/pkg/gen/streamapi/v1"
 )
 
+var errPluginManagerConfig = errors.New("plugin manager address and timeout are required")
+
 type app struct {
-	media        *media.Manager
-	publisher    *natsadapter.Publisher
-	events       *events.Receiver
-	dispatcher   *events.Dispatcher
-	eventStreams *eventsgrpc.Server
-	webhook      *webhookport.Handler
-	streams      *mediagrpc.Server
-	grpc         *grpc.Server
-	http         *http.Server
+	media         *media.Manager
+	publisher     *natsadapter.Publisher
+	events        *events.Receiver
+	dispatcher    *events.Dispatcher
+	eventStreams  *eventsgrpc.Server
+	webhook       *webhookport.Handler
+	streams       *mediagrpc.Server
+	grpc          *grpc.Server
+	http          *http.Server
+	pluginManager *grpc.ClientConn
 }
 
 func newApp(c *config, logger *slog.Logger) (*app, error) {
+	if c.PluginManager.Address == "" || c.PluginManager.Timeout <= 0 {
+		return nil, errPluginManagerConfig
+	}
+
+	conn, err := grpc.NewClient(c.PluginManager.Address, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return nil, fmt.Errorf("configure plugin manager: %w", err)
+	}
+
+	permissionClient := permissions.New(routes.NewRoutesServiceClient(conn), c.PluginManager.Timeout)
+
+	var eventTypes []string
+	for _, value := range c.LiveKit.EventTypes {
+		eventTypes = append(eventTypes, value)
+	}
+
 	source := livekitadapter.New(c.sourceConfig(), logger)
 	manager := media.New(c.mediaConfig(), source)
 
 	publisher, err := natsadapter.New(c.publisherConfig())
 	if err != nil {
+		_ = conn.Close()
+
 		return nil, fmt.Errorf("configure event publisher: %w", err)
 	}
 
@@ -69,15 +94,18 @@ func newApp(c *config, logger *slog.Logger) (*app, error) {
 	dispatcher := events.NewDispatcher(c.deliveryConfig(), subscriber)
 
 	app := &app{
-		media:      manager,
-		publisher:  publisher,
-		events:     receiver,
-		dispatcher: dispatcher,
+		pluginManager: conn,
+		media:         manager,
+		publisher:     publisher,
+		events:        receiver,
+		dispatcher:    dispatcher,
 		eventStreams: eventsgrpc.New(
 			dispatcher,
 			c.Events.Delivery.SendTimeout,
 			c.GRPC.LatencyBucketsSeconds,
 			logger,
+			permissionClient,
+			eventTypes,
 		),
 		webhook: hook,
 		streams: mediagrpc.New(
@@ -85,11 +113,13 @@ func newApp(c *config, logger *slog.Logger) (*app, error) {
 			c.GRPC.SendTimeout,
 			c.GRPC.LatencyBucketsSeconds,
 			logger,
+			permissionClient,
 		),
 	}
 
 	callActions := actions.New(
 		lksdk.NewRoomServiceClient(c.LiveKit.URL, c.LiveKit.APIKey, c.LiveKit.APISecret),
+		permissionClient,
 	)
 	app.grpc = newGRPCServer(c.GRPC, app.streams, app.eventStreams, callActions)
 	app.http = app.newHTTPServer(c.HTTP)

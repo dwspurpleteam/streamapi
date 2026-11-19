@@ -26,6 +26,7 @@ type Server struct {
 	pb.UnimplementedMediaServiceServer
 
 	manager      *media.Manager
+	permissions  MediaPermissions
 	timeout      time.Duration
 	logger       *slog.Logger
 	wg           sync.WaitGroup
@@ -35,18 +36,24 @@ type Server struct {
 	sendDuration *metrics.Histogram
 }
 
+type MediaPermissions interface {
+	Media(ctx context.Context, call, activation string) (uint8, error)
+}
+
 func New(
 	manager *media.Manager,
 	timeout time.Duration,
 	buckets []float64,
 	logger *slog.Logger,
+	permissions MediaPermissions,
 ) *Server {
 	buckets = slices.Clone(buckets)
 
 	return &Server{
-		manager: manager,
-		timeout: timeout,
-		logger:  logger,
+		manager:     manager,
+		permissions: permissions,
+		timeout:     timeout,
+		logger:      logger,
 
 		queueAge: metrics.NewHistogram(prometheus.HistogramOpts{
 			Name: "streamapi_media_queue_age_seconds",
@@ -65,15 +72,29 @@ func New(
 }
 
 func (s *Server) Subscribe(request *pb.SubscribeRequest, stream rpc.ServerStreamingServer[pb.SubscribeResponse]) error {
+	sources, err := s.permissions.Media(stream.Context(), request.GetCallId(), request.GetActivationId())
+	if err != nil {
+		return fmt.Errorf("check media permission: %w", err)
+	}
+
 	selection := domain.Selection{
 		Participant: request.GetParticipantId(),
 		Track:       request.GetTrackId(),
+		Sources:     sources,
 	}
 	for _, kind := range request.GetKinds() {
 		switch kind {
 		case pb.MediaKind_MEDIA_KIND_AUDIO:
+			if sources&(1<<domain.Microphone|1<<domain.ScreenShareAudio) == 0 {
+				return status.Error(codes.PermissionDenied, "audio is not allowed")
+			}
+
 			selection.Kinds |= 1 << domain.Audio
 		case pb.MediaKind_MEDIA_KIND_VIDEO:
+			if sources&(1<<domain.Camera|1<<domain.ScreenShare) == 0 {
+				return status.Error(codes.PermissionDenied, "video is not allowed")
+			}
+
 			selection.Kinds |= 1 << domain.Video
 		default:
 			return status.Error(codes.InvalidArgument, "unsupported media kind")

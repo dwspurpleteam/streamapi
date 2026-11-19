@@ -14,6 +14,7 @@ message SubscribeEventsRequest {
   string call_id = 1;
   string participant_id = 2;
   repeated string event_types = 3;
+  string activation_id = 4;
 }
 
 message SubscribeEventsResponse {

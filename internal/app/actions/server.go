@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"strings"
 	"time"
@@ -42,17 +43,26 @@ type rooms interface {
 type Server struct {
 	pb.UnimplementedActionServiceServer
 
-	rooms rooms
+	rooms       rooms
+	permissions ActionPermissions
 }
 
-func New(rooms rooms) *Server {
-	return &Server{rooms: rooms}
+type ActionPermissions interface {
+	Action(ctx context.Context, call, activation, action string) error
+}
+
+func New(rooms rooms, permissions ActionPermissions) *Server {
+	return &Server{rooms: rooms, permissions: permissions}
 }
 
 func (s *Server) SendEvent(ctx context.Context, req *pb.SendEventRequest) (*pb.SendEventResponse, error) {
 	id, err := validateEvent(req)
 	if err != nil {
 		return nil, err
+	}
+
+	if permissionErr := s.permissions.Action(ctx, req.GetCallId(), req.GetActivationId(), req.GetEventName()); permissionErr != nil {
+		return nil, fmt.Errorf("check action permission: %w", permissionErr)
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, actionTimeout)

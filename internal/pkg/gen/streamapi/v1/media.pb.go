@@ -77,6 +77,7 @@ type SubscribeRequest struct {
 	ParticipantId string                 `protobuf:"bytes,3,opt,name=participant_id,json=participantId,proto3" json:"participant_id,omitempty"`
 	TrackId       string                 `protobuf:"bytes,4,opt,name=track_id,json=trackId,proto3" json:"track_id,omitempty"`
 	Kinds         []MediaKind            `protobuf:"varint,5,rep,packed,name=kinds,proto3,enum=streamapi.v1.MediaKind" json:"kinds,omitempty"`
+	ActivationId  string                 `protobuf:"bytes,6,opt,name=activation_id,json=activationId,proto3" json:"activation_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -144,6 +145,13 @@ func (x *SubscribeRequest) GetKinds() []MediaKind {
 		return x.Kinds
 	}
 	return nil
+}
+
+func (x *SubscribeRequest) GetActivationId() string {
+	if x != nil {
+		return x.ActivationId
+	}
+	return ""
 }
 
 type SubscribeResponse struct {
@@ -452,13 +460,14 @@ var File_streamapi_v1_media_proto protoreflect.FileDescriptor
 
 const file_streamapi_v1_media_proto_rawDesc = "" +
 	"\n" +
-	"\x18streamapi/v1/media.proto\x12\fstreamapi.v1\"\xb9\x01\n" +
+	"\x18streamapi/v1/media.proto\x12\fstreamapi.v1\"\xde\x01\n" +
 	"\x10SubscribeRequest\x12\x17\n" +
 	"\acall_id\x18\x01 \x01(\tR\x06callId\x12\x1b\n" +
 	"\troom_name\x18\x02 \x01(\tR\broomName\x12%\n" +
 	"\x0eparticipant_id\x18\x03 \x01(\tR\rparticipantId\x12\x19\n" +
 	"\btrack_id\x18\x04 \x01(\tR\atrackId\x12-\n" +
-	"\x05kinds\x18\x05 \x03(\x0e2\x17.streamapi.v1.MediaKindR\x05kinds\"\xb4\x01\n" +
+	"\x05kinds\x18\x05 \x03(\x0e2\x17.streamapi.v1.MediaKindR\x05kinds\x12#\n" +
+	"\ractivation_id\x18\x06 \x01(\tR\factivationId\"\xb4\x01\n" +
 	"\x11SubscribeResponse\x12/\n" +
 	"\x05track\x18\x01 \x01(\v2\x17.streamapi.v1.TrackInfoH\x00R\x05track\x121\n" +
 	"\x06packet\x18\x02 \x01(\v2\x17.streamapi.v1.RtpPacketH\x00R\x06packet\x120\n" +

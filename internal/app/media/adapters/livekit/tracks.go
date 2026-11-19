@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/livekit/protocol/livekit"
 	lksdk "github.com/livekit/server-sdk-go/v2"
 	"github.com/pion/webrtc/v4"
 
@@ -60,6 +61,7 @@ func (r *trackReaders) subscribe(
 		ID:          pub.SID(),
 		Participant: participant.Identity(),
 		Kind:        kind(pub),
+		Source:      source(pub),
 
 		MIME:      codec.MimeType,
 		ClockRate: codec.ClockRate,
@@ -111,6 +113,7 @@ func selectTracks(room *lksdk.Room, wants func(domain.Track) bool, requested map
 				ID:          pub.SID(),
 				Participant: participant.Identity(),
 				Kind:        kind(pub),
+				Source:      source(pub),
 			})
 			if selected == requested[pub.SID()] {
 				continue
@@ -179,4 +182,19 @@ func kind(pub lksdk.TrackPublication) domain.MediaKind {
 	}
 
 	return domain.Video
+}
+
+func source(pub lksdk.TrackPublication) uint8 {
+	switch pub.Source() {
+	case livekit.TrackSource_MICROPHONE:
+		return domain.Microphone
+	case livekit.TrackSource_CAMERA:
+		return domain.Camera
+	case livekit.TrackSource_SCREEN_SHARE:
+		return domain.ScreenShare
+	case livekit.TrackSource_SCREEN_SHARE_AUDIO:
+		return domain.ScreenShareAudio
+	default:
+		return 0
+	}
 }
