@@ -143,6 +143,16 @@ func (c *Client) Events(ctx context.Context, call, activation string, requested,
 
 		if result.GetCanSend() {
 			allowed = append(allowed, name)
+			switch name {
+			case "media.track_published":
+				allowed = append(allowed, "track.published")
+			case "track.published":
+				allowed = append(allowed, "media.track_published")
+			case "media.track_unpublished":
+				allowed = append(allowed, "track.unpublished")
+			case "track.unpublished":
+				allowed = append(allowed, "media.track_unpublished")
+			}
 		} else if explicit {
 			return nil, status.Error(codes.PermissionDenied, "event is not allowed")
 		}

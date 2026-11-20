@@ -36,7 +36,9 @@ func (f *fakeRoutes) CheckEventPermission(_ context.Context, req *routes.CheckEv
 		return nil, errUnavailable
 	}
 
-	return &routes.CheckEventPermissionResponse{CanSend: req.GetEventType() == routes.EventType_EVENT_TYPE_PARTICIPANT_JOINED}, nil
+	return &routes.CheckEventPermissionResponse{CanSend: req.GetEventType() == routes.EventType_EVENT_TYPE_PARTICIPANT_JOINED ||
+		req.GetEventType() == routes.EventType_EVENT_TYPE_MEDIA_TRACK_PUBLISHED ||
+		req.GetEventType() == routes.EventType_EVENT_TYPE_MEDIA_TRACK_UNPUBLISHED}, nil
 }
 
 func (f *fakeRoutes) CheckMediaPermission(_ context.Context, req *routes.CheckMediaPermissionRequest, _ ...grpc.CallOption) (*routes.CheckMediaPermissionResponse, error) {
@@ -86,5 +88,27 @@ func TestChecksActivationPermissions(t *testing.T) {
 
 	if status.Code(client.Action(ctx, "call", "activation", "x")) != codes.Unavailable {
 		t.Fatal("service failure accepted")
+	}
+}
+
+func TestTrackEventAliases(t *testing.T) {
+	client := New(&fakeRoutes{}, time.Second)
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", "Bearer secret"))
+
+	for _, tc := range []struct {
+		requested string
+		alias     string
+	}{
+		{"media.track_published", "track.published"},
+		{"track.published", "media.track_published"},
+		{"media.track_unpublished", "track.unpublished"},
+		{"track.unpublished", "media.track_unpublished"},
+	} {
+		t.Run(tc.requested, func(t *testing.T) {
+			got, err := client.Events(ctx, "call", "activation", []string{tc.requested}, nil)
+			if err != nil || len(got) != 2 || got[0] != tc.requested || got[1] != tc.alias {
+				t.Fatalf("events: %v, error: %v", got, err)
+			}
+		})
 	}
 }

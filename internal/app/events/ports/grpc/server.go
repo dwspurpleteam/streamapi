@@ -121,6 +121,7 @@ func (s *Server) Subscribe(
 			stream,
 			sub,
 			counters,
+			request.GetEventTypes(),
 		)
 	})
 
@@ -153,6 +154,7 @@ func (s *Server) send(
 	stream rpc.ServerStreamingServer[pb.SubscribeEventsResponse],
 	sub *events.Subscription,
 	counters *streamstats.Sender,
+	requested []string,
 ) error {
 	defer s.counters.Stop(counters)
 
@@ -162,7 +164,7 @@ func (s *Server) send(
 			return err
 		}
 
-		response := eventResponse(item.Event)
+		response := eventResponse(item.Event, requested)
 
 		start := time.Now()
 		s.queueAge.Observe(counters.Histogram, start.Sub(item.ReceivedAt).Seconds())
@@ -181,7 +183,8 @@ func (s *Server) send(
 	}
 }
 
-func eventResponse(event domain.Event) *pb.SubscribeEventsResponse {
+func eventResponse(event domain.Event, requested []string) *pb.SubscribeEventsResponse {
+	event.Type = eventTypeForSubscriber(event.Type, requested)
 	message := &eventMessage{}
 	message.occurredAt = *timestamppb.New(event.OccurredAt)
 	message.response = pb.SubscribeEventsResponse{
@@ -196,6 +199,25 @@ func eventResponse(event domain.Event) *pb.SubscribeEventsResponse {
 	}
 
 	return &message.response
+}
+
+func eventTypeForSubscriber(name string, requested []string) string {
+	switch name {
+	case "track.published", "media.track_published":
+		if slices.Contains(requested, "track.published") && !slices.Contains(requested, "media.track_published") {
+			return "track.published"
+		}
+
+		return "media.track_published"
+	case "track.unpublished", "media.track_unpublished":
+		if slices.Contains(requested, "track.unpublished") && !slices.Contains(requested, "media.track_unpublished") {
+			return "track.unpublished"
+		}
+
+		return "media.track_unpublished"
+	default:
+		return name
+	}
 }
 
 func (s *Server) subscriptionError(err error) error {
